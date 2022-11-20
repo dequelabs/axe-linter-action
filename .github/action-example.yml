@@ -9,7 +9,7 @@ on:
       - synchronize
 
 jobs:
-  axe-linter:
+  axe-linter: 
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
