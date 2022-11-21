@@ -35,24 +35,20 @@ runs:
         ApiKey="${{ inputs.api_key }}"
         LinterConfig={}
         if [ -f axe-linter.yml ]; then
-        echo "axe linter exists"
         CheckLinterConfig="$(yq axe-linter.yml)"
           if [ -n "$CheckLinterConfig" ]; then
-            echo "here"
             LinterConfig="$(yq -o=json axe-linter.yml)"
           fi
         fi
-        echo "$LinterConfig"
         FoundErrors="0"
         for File in $Files; do
-          echo "::debug::Linting $File"
           FileContents="$(cat "$File")"
           RequestBody=$(
             jq \
               --null-input \
               --arg Source "$FileContents" \
               --arg Filename "$File" \
-              --arg Config "$LinterConfig" \
+              --argjson Config "$LinterConfig" \
               '{ "source": $Source, "filename": $Filename, "config": $Config }'
           )
           Response=$(
