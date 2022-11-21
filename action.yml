@@ -33,7 +33,7 @@ runs:
       run: |
         Files="${{ steps.changed_files.outputs.all_changed_files }}"
         ApiKey="${{ inputs.api_key }}"
-        LinterConfig=""
+        LinterConfig={}
         if [ $(yq -o=json axe-linter.yml) != 'null'  ] {
           LinterConfig="$(yq -o=json axe-linter.yml)"
         }
