@@ -37,6 +37,7 @@ runs:
         if [ $(yq -o=json axe-linter.yml) != "null"  ]; then
           LinterConfig="$(yq -o=json axe-linter.yml)"
         fi
+        echo "$LinterConfig"
         FoundErrors="0"
         for File in $Files; do
           echo "::debug::Linting $File"
