@@ -35,7 +35,7 @@ runs:
         ApiKey="${{ inputs.api_key }}"
         LinterConfig={}
         echo $(yq -o=json axe-linter.yml)
-        if [ $(yq -o=json axe-linter.yml) != "null"  ]; then
+        if [ $(echo yq -o=json axe-linter.yml) != "null"  ]; then
           LinterConfig="$(yq -o=json axe-linter.yml)"
         fi
         echo "$LinterConfig"
