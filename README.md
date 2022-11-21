@@ -25,4 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: dequelabs/axe-linter-action@v1
+        with:
+          api_key: ${{ secrets.AXE_LINTER_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
