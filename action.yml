@@ -35,8 +35,9 @@ runs:
         ApiKey="${{ inputs.api_key }}"
         LinterConfig={}
         if [ -f axe-linter.yml ]; then
-        CheckLinterConfig="$(echo yq -o=json axe-linter.yml)"
-          if [ -z "$CheckLinterConfig" ]; then
+        echo "axe linter exists"
+        CheckLinterConfig="$(yq axe-linter.yml)"
+          if [ -n "$CheckLinterConfig" ]; then
             echo "here"
             LinterConfig="$(yq -o=json axe-linter.yml)"
           fi
