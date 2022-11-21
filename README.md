@@ -8,7 +8,7 @@ A GitHub Action to lint for any accessibility issues in your pull requests.
 
 **Required** Your API key for axe-linter.
 
-\* To request for an API key for axe-linter, please visit [accessibility.deque.com/linter-contact-us](accessibility.deque.com/linter-contact-us) once provisioned please visit [https://docs.deque.com/linter/1.0.0/en/axe-linter-api-key](https://docs.deque.com/linter/1.0.0/en/axe-linter-api-key) to get your API key.
+\* To request an API key for axe-linter, please visit [accessibility.deque.com/linter-contact-us](accessibility.deque.com/linter-contact-us). Once provisioned please visit [https://docs.deque.com/linter/1.0.0/en/axe-linter-api-key](https://docs.deque.com/linter/1.0.0/en/axe-linter-api-key) to get your API key.
 
 ## Example Usage
 
