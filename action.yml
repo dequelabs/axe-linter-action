@@ -9,7 +9,7 @@ inputs:
     description: axe Linter API Key
     required: true
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
     - uses: actions/checkout@v2
     - uses: mikefarah/yq@master
@@ -33,7 +33,10 @@ runs:
       run: |
         Files="${{ steps.changed_files.outputs.all_changed_files }}"
         ApiKey="${{ inputs.api_key }}"
-        LinterConfig="$(yq -o=json axe-linter.yml)"
+        LinterConfig=""
+        if [ $(yq -o=json axe-linter.yml) != 'null'  ] {
+          LinterConfig="$(yq -o=json axe-linter.yml)"
+        }
         FoundErrors="0"
         for File in $Files; do
           echo "::debug::Linting $File"
@@ -73,4 +76,4 @@ runs:
         if [ "$FoundErrors" != "0" ]; then
           exit 1
         fi
-      shell: bash 
+      shell: bash
