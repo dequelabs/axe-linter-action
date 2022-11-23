@@ -1,7 +1,6 @@
 name: Run axe Accessibility Linter
 description: Lints all changed files using the axe Accessibility Linter
 inputs:
-  # no files input, just files ignore
   github_token:
     description: Github Token
     required: true
@@ -13,7 +12,6 @@ runs:
   steps:
     - uses: actions/checkout@v2
     - uses: mikefarah/yq@master
-    - uses: sergeysova/jq-action@v2
     - name: Get changed files
       id: changed_files
       env:
@@ -28,16 +26,14 @@ runs:
           **/*.vue
           **/*.md
           **/*.markdown
-    - name: Create linter issues comment
+    - name: Run axe linter
       if: steps.changed_files.outputs.any_changed == 'true'
       run: |
         Files="${{ steps.changed_files.outputs.all_changed_files }}"
         ApiKey="${{ inputs.api_key }}"
         LinterConfig={}
-        # Check to make sure there is an `axe-linter.yml` file in the root level of the repo
         if [ -f axe-linter.yml ]; then
-        CheckLinterConfig="$(yq axe-linter.yml)"
-          # Make sure that the `axe-linter.yml` file is not empty
+          CheckLinterConfig="$(yq axe-linter.yml)"
           if [ -n "$CheckLinterConfig" ]; then
             LinterConfig="$(yq -o=json axe-linter.yml)"
           fi
@@ -63,7 +59,7 @@ runs:
               --data "${RequestBody}"
           )
           if [ $(echo "$Response" | jq 'has("error")') = "true" ]; then
-            echo axe Linter: $(echo "$Response" | jq -r '.error')
+            $(echo "$Response" | jq -r '.error')
             exit 1
           fi
           ErrorCount=$(echo "$Response" | jq '.report.errors | length')
