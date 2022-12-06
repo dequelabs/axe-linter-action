@@ -1,6 +1,12 @@
 #! /bin/bash 
 Files="$CHANGED_FILES"
 ApiKey="$API_KEY"
+AxeLinterUrl="$AXE_LINTER_URL"
+
+if [ -n "$AxeLinterUrl" ]; then
+  AxeLinterUrl="https://axe-linter.deque.com/lint-source"
+fi
+
 LinterConfig={}
 if [ -f axe-linter.yml ]; then
   CheckLinterConfig="$(yq axe-linter.yml)"
@@ -23,7 +29,7 @@ for File in $Files; do
     curl \
       --silent \
       --request POST \
-      --url https://axe-linter.deque.com/lint-source \
+      --url "$AxeLinterUrl" \
       --header "content-type: application/json" \
       --header "authorization: $ApiKey" \
       --data "${RequestBody}"
