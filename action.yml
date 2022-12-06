@@ -33,4 +33,5 @@ runs:
         GITHUB_TOKEN: ${{ inputs.github_token }}
         API_KEY: ${{ inputs.api_key }}
         CHANGED_FILES: ${{ steps.changed_files.outputs.all_changed_files }}
+        AXE_LINTER_URL: ${{ inputs.axe_linter_url }}
       shell: bash
