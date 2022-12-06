@@ -1,6 +1,6 @@
 #! /bin/bash 
-Files="${{ steps.changed_files.outputs.all_changed_files }}"
-ApiKey="${{ inputs.api_key }}"
+Files="$CHANGED_FILES"
+ApiKey="$API_KEY"
 LinterConfig={}
 if [ -f axe-linter.yml ]; then
   CheckLinterConfig="$(yq axe-linter.yml)"
