@@ -3,7 +3,7 @@ Files="$CHANGED_FILES"
 ApiKey="$API_KEY"
 AxeLinterUrl="$AXE_LINTER_URL"
 
-if [ -n "$AxeLinterUrl" ]; then
+if [ -z "$AxeLinterUrl" ]; then
   AxeLinterUrl="https://axe-linter.deque.com/lint-source"
 fi
 
