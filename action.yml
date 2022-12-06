@@ -7,6 +7,10 @@ inputs:
   api_key:
     description: axe Linter API Key
     required: true
+  axe_linter_url:
+    description: axe Linter URL
+    required: false
+    default: https://axe-linter.deque.com/lint-source
 runs:
   using: 'composite'
   steps:
