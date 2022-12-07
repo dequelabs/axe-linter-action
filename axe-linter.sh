@@ -4,8 +4,11 @@ ApiKey="$API_KEY"
 AxeLinterUrl="$AXE_LINTER_URL"
 
 if [ -z "$AxeLinterUrl" ]; then
-  AxeLinterUrl="https://axe-linter.deque.com/lint-source"
+  AxeLinterUrl="https://axe-linter.deque.com"
 fi
+
+# Trim trailing slash
+AxeLinterUrl="${AxeLinterUrl%/}"
 
 LinterConfig={}
 if [ -f axe-linter.yml ]; then
@@ -29,7 +32,7 @@ for File in $Files; do
     curl \
       --silent \
       --request POST \
-      --url "$AxeLinterUrl" \
+      --url "$AxeLinterUrl/lint-source" \
       --header "content-type: application/json" \
       --header "authorization: $ApiKey" \
       --data "${RequestBody}"
