@@ -10,7 +10,7 @@ inputs:
   axe_linter_url:
     description: axe Linter URL
     required: false
-    default: https://axe-linter.deque.com/lint-source
+    default: https://axe-linter.deque.com
 runs:
   using: 'composite'
   steps:
