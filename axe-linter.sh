@@ -7,6 +7,9 @@ if [ -z "$AxeLinterUrl" ]; then
   AxeLinterUrl="https://axe-linter.deque.com"
 fi
 
+# Trim trailing slash
+AxeLinterUrl="${AxeLinterUrl%/}"
+
 LinterConfig={}
 if [ -f axe-linter.yml ]; then
   CheckLinterConfig="$(yq axe-linter.yml)"
