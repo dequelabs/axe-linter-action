@@ -3,6 +3,8 @@ import { getOctokit, context } from '@actions/github'
 import axios from 'axios'
 
 const run = async () => {
+  console.log('Starting axe Linter');
+  
   const apiKey = core.getInput('api-key')
   const axeLinterUrl = core.getInput('axe-linter-url')
   const token = core.getInput('github-token', { required: true })
