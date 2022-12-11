@@ -19,7 +19,7 @@ const run = async () => {
     'GET /repos/{owner}/{repo}/pulls/{pull_number}/files',
     { owner, repo, pull_number: pr?.number as number }
   )
-
+  console.log(JSON.stringify(files, null, 2))
   for (const file of files) {
     const res = await octokit.request(
       'GET /repos/{owner}/{repo}/contents/{path}',
@@ -32,6 +32,8 @@ const run = async () => {
       filename: file.filename
     })
     results.push(result.data)
+    console.log(JSON.stringify(result.data, null, 2))
+
     if (results.length) {
       for (const result of results) {
         for (const issue of result.report.errors) {
