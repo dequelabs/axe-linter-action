@@ -12,25 +12,5 @@ inputs:
     required: false
     default: https://axe-linter.deque.com
 runs:
-  using: 'composite'
-  steps:
-    - uses: actions/checkout@v2
-    - uses: mikefarah/yq@master
-    - name: Get changed files
-      id: changed_files
-      env:
-        GITHUB_TOKEN: ${{ inputs.github_token }}
-      uses: tj-actions/changed-files@v18.7
-      with:
-        files: |
-          **/*.js
-          **/*.jsx
-          **/*.tsx
-          **/*.html
-          **/*.vue
-          **/*.md
-          **/*.markdown
-    - name: Run axe linter
-      if: steps.changed_files.outputs.any_changed == 'true'
-      using: 'docker'
-      image: 'Dockerfile'
+  using: 'docker'
+  image: 'Dockerfile'
