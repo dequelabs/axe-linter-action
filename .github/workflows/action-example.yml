@@ -15,5 +15,5 @@ jobs:
       - uses: actions/checkout@v2
       - uses: ./
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          api_key: ${{ secrets.AXE_LINTER_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          api-key: ${{ secrets.AXE_LINTER_API_KEY }}
