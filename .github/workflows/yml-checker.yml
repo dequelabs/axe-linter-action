@@ -17,4 +17,4 @@ jobs:
         with:
           node-version: 16
       # This validator doesn't accept globs.
-      - run: npx yaml-validator action.yml .github/action-example.yml
+      - run: npx yaml-validator action.yml 

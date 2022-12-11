@@ -1,13 +1,13 @@
 name: Run axe Accessibility Linter
 description: Lints all changed files using the axe Accessibility Linter
 inputs:
-  github_token:
+  github-token:
     description: Github Token
     required: true
-  api_key:
+  api-key:
     description: axe Linter API Key
     required: true
-  axe_linter_url:
+  axe-linter-url:
     description: axe Linter URL
     required: false
     default: https://axe-linter.deque.com
@@ -32,10 +32,5 @@ runs:
           **/*.markdown
     - name: Run axe linter
       if: steps.changed_files.outputs.any_changed == 'true'
-      run: ${{ github.action_path }}/axe-linter.sh
-      env:
-        GITHUB_TOKEN: ${{ inputs.github_token }}
-        API_KEY: ${{ inputs.api_key }}
-        CHANGED_FILES: ${{ steps.changed_files.outputs.all_changed_files }}
-        AXE_LINTER_URL: ${{ inputs.axe_linter_url }}
-      shell: bash
+      using: 'docker'
+      image: 'Dockerfile'
