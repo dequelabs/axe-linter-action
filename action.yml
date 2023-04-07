@@ -1,5 +1,8 @@
 name: Run axe Accessibility Linter
 description: Lints all changed files using the axe DevTools Linter
+branding:
+  icon: 'check-circle'
+  color: 'blue'
 inputs:
   github_token:
     description: Github Token
