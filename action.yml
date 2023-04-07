@@ -1,5 +1,5 @@
 name: Run axe Accessibility Linter
-description: Lints all changed files using the axe Accessibility Linter
+description: Lints all changed files using the axe DevTools Linter
 inputs:
   github_token:
     description: Github Token
