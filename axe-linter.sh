@@ -1,4 +1,4 @@
-#! /bin/bash 
+#! /bin/bash
 Files="$CHANGED_FILES"
 ApiKey="$API_KEY"
 AxeLinterUrl="$AXE_LINTER_URL"
@@ -37,12 +37,13 @@ for File in $Files; do
       --header "authorization: $ApiKey" \
       --data "${RequestBody}"
   )
-  if [ $(echo "$Response" | jq 'has("error")') = "true" ]; then
-    $(echo "$Response" | jq -r '.error')
+
+  if [[ $(echo "$Response" | jq 'has("error")') = "true" ]]; then
+    echo "$Response"
     exit 1
   fi
   ErrorCount=$(echo "$Response" | jq '.report.errors | length')
-  if [ "$ErrorCount" != "0" ]; then
+  if [[ "$ErrorCount" != "0" ]]; then
     ((FoundErrors += ErrorCount))
   fi
   echo "$Response" |
@@ -52,6 +53,6 @@ for File in $Files; do
     done
 done
 echo "::debug::Found $FoundErrors errors"
-if [ "$FoundErrors" != "0" ]; then
+if [[ "$FoundErrors" != "0" ]]; then
   exit 1
 fi
