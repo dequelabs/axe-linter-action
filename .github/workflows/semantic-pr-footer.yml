@@ -1,5 +1,4 @@
-name: Semantic PR title
-
+name: Semantic PR footer
 on:
   pull_request:
     types:
@@ -7,11 +6,9 @@ on:
       - reopened
       - edited
       - synchronize
-
 jobs:
-  semantic-pr-title:
+  semantic-pr-footer:
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
-      - uses: actions/checkout@v2
-      - uses: dequelabs/semantic-pr-title@main
+      - uses: dequelabs/axe-api-team-public/.github/actions/semantic-pr-footer-v1@main
