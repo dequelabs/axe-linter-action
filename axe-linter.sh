@@ -3,7 +3,7 @@
 set -xe
 
 throw() {
-  echo "Error: $*"
+  echo "Error: $*">&2
   exit 1
 }
 
