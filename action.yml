@@ -17,13 +17,13 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - uses: actions/checkout@v2
-    - uses: mikefarah/yq@master
+    - uses: actions/checkout@v4
+    - uses: mikefarah/yq@f15500b20a1c991c8729870ba60a4dc3524b6a94 # Tag=v4
     - name: Get changed files
       id: changed_files
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
-      uses: tj-actions/changed-files@v18.7
+      uses: tj-actions/changed-files@6b2903bdce6310cfbddd87c418f253cf29b2dec9 # Tag=v44
       with:
         files: |
           **/*.js
