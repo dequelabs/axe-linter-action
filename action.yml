@@ -18,12 +18,12 @@ runs:
   using: "composite"
   steps:
     - uses: actions/checkout@v4
-    - uses: mikefarah/yq@bbdd97482f2d439126582a59689eb1c855944955 # Tag=v4
+    - uses: mikefarah/yq@bbdd97482f2d439126582a59689eb1c855944955
     - name: Get changed files
       id: changed_files
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
-      uses: tj-actions/changed-files@c3a1bb2c992d77180ae65be6ae6c166cf40f857c # Tag=v44
+      uses: tj-actions/changed-files@c3a1bb2c992d77180ae65be6ae6c166cf40f857c
       with:
         files: |
           **/*.js
