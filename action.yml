@@ -18,7 +18,7 @@ runs:
   using: "composite"
   steps:
     - uses: actions/checkout@v4
-    - uses: mikefarah/yq@f15500b20a1c991c8729870ba60a4dc3524b6a94 # Tag=v4
+    - uses: mikefarah/yq@bbdd97482f2d439126582a59689eb1c855944955 # Tag=v4
     - name: Get changed files
       id: changed_files
       env:
