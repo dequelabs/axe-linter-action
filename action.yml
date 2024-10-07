@@ -23,7 +23,7 @@ runs:
       id: changed_files
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
-      uses: tj-actions/changed-files@6b2903bdce6310cfbddd87c418f253cf29b2dec9 # Tag=v44
+      uses: tj-actions/changed-files@c3a1bb2c992d77180ae65be6ae6c166cf40f857c # Tag=v44
       with:
         files: |
           **/*.js
