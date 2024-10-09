@@ -7,10 +7,7 @@ throw() {
   exit 1
 }
 
-[ -z "$API_KEY" ] && throw "API_KEY is required"
-
 Files="$CHANGED_FILES"
-ApiKey="$API_KEY"
 AxeLinterUrl="$AXE_LINTER_URL"
 FoundErrors="0"
 LinterConfig={}
@@ -47,7 +44,6 @@ for File in $Files; do
       --request POST \
       --url "$AxeLinterUrl/lint-source" \
       --header "content-type: application/json" \
-      --header "authorization: $ApiKey" \
       --data "${RequestBody}"
   )
 

@@ -6,7 +6,7 @@ A GitHub Action to lint for any accessibility issues in your pull requests.
 
 ### `api_key`
 
-**Required** Your API key for axe-linter.
+**Optional** Your API key for axe-linter.
 
 ### `axe_linter_url`
 
@@ -31,6 +31,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dequelabs/axe-linter-action@v1
         with:
-          api_key: ${{ secrets.AXE_LINTER_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
