@@ -32,6 +32,11 @@ fi
 for File in $Files; do
   FileContents="$(cat "$File")"
 
+  if [ -z "$FileContents" ] || [ "$(echo "$FileContents" | tr -d '[:space:]')" = "" ]; then
+    echo "::debug::Skipping empty file $File"
+    continue
+  fi
+
   RequestBody=$(
     jq \
       --null-input \
