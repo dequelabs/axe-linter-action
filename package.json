@@ -6,7 +6,9 @@
     "build": "ncc build src/index.ts --license licenses.txt",
     "lint": "eslint .",
     "fmt": "prettier --write \"src/**/*.{js,ts,tsx,json,md,css,html}\"",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "mocha 'src/**/*.test.ts'",
+    "coverage": "nyc yarn test"
   },
   "dependencies": {
     "@actions/core": "^1.11.1",
@@ -17,15 +19,25 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",
+    "@types/chai": "^5.0.1",
     "@types/js-yaml": "^4.0.9",
+    "@types/mocha": "^10.0.10",
+    "@types/nock": "^11.1.0",
     "@types/node": "^22.13.1",
     "@types/node-fetch": "^2.6.12",
+    "@types/sinon": "^17.0.3",
     "@vercel/ncc": "^0.38.3",
+    "chai": "4",
     "eslint": "^9.20.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.4.3",
+    "mocha": "^11.1.0",
+    "nock": "^14.0.1",
+    "nyc": "^17.1.0",
     "prettier": "^3.4.2",
     "rimraf": "^6.0.1",
+    "sinon": "^19.0.2",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.23.0"
   },
@@ -36,6 +48,25 @@
     "*.{js,ts}": [
       "eslint --fix",
       "prettier --write"
+    ]
+  },
+  "nyc": {
+    "checkCoverage": true,
+    "extension": [
+      ".ts"
+    ],
+    "reporter": [
+      "text-summary",
+      "html"
+    ],
+    "statements": 85,
+    "branches": 85,
+    "functions": 85,
+    "lines": 85,
+    "exclude": [
+      "dist",
+      "coverage",
+      "**/*.test.ts"
     ]
   }
 }

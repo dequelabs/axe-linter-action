@@ -25,6 +25,13 @@ module.exports = [
     }
   },
   {
+    files: ['src/**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-require-imports': 'off'
+    }
+  },
+  {
     ignores: ['**/node_modules/', '**/dist/', '**/coverage/', '**/.nyc_output/']
   }
 ]
