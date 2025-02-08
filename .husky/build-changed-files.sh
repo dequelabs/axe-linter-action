@@ -19,9 +19,6 @@ function run_build {
 }
 
 cd "$(dirname -- "$0")/../."
-files=$(git diff HEAD~1 --name-only --relative)
-if [ "$files" != "" ]; then
-  run_build "$files"
-fi
+yarn build
 
 git add .
