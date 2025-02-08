@@ -15,5 +15,5 @@ inputs:
     required: false
     default: https://axe-linter.deque.com
 runs:
-  using: 'node22'
+  using: 'node20'
   main: 'dist/index.js'

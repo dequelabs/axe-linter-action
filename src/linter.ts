@@ -1,6 +1,7 @@
 import * as core from '@actions/core'
 import { readFile } from 'fs/promises'
 import type { LinterResponse } from './types'
+import fetch from 'node-fetch'
 
 export async function lintFiles(
   files: string[],
