@@ -43153,7 +43153,9 @@ ${pendingInterceptorsFormatter.format(pending)}
               linterConfig
             )
             if (errorCount > 0) {
-              core.setFailed(`Found ${errorCount} accessibility issues`)
+              core.setFailed(
+                `Found ${errorCount} accessibility issue${errorCount === 1 ? '' : 's'}`
+              )
             }
           } catch (error) {
             if (error instanceof Error) {
