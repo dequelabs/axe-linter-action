@@ -1,8 +1,8 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
+#!/bin/bash
 
-# this file requires bash to run in github actions (github
-# actions use dash as default `sh` command)
-# @see https://github.com/typicode/husky/issues/1326
-bash "$(dirname -- "$0")/build-changed-files.sh"
+cd "$(dirname -- "$0")/../."
+yarn build
+
+git add .
+
 npx lint-staged
