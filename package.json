@@ -1,0 +1,39 @@
+{
+  "name": "axe-linter-action",
+  "version": "1.0.0",
+  "scripts": {
+    "prebuild": "rimraf dist",
+    "build": "ncc build src/index.ts --license licenses.txt",
+    "lint": "eslint .",
+    "fmt": "prettier --write \"src/**/*.{js,ts,tsx,json,md,css,html}\"",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0",
+    "js-yaml": "^4.1.0",
+    "minimatch": "^9.0.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.13.1",
+    "@vercel/ncc": "^0.38.3",
+    "eslint": "^9.20.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
+    "prettier": "^3.4.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.23.0"
+  },
+  "lint-staged": {
+    "*.{md,json,js,ts,html}": [
+      "prettier --write"
+    ],
+    "*.{js,ts}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  }
+}
