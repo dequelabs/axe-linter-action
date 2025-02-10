@@ -2,13 +2,7 @@ import { readFile } from 'fs/promises'
 import { load } from 'js-yaml'
 import { lintFiles } from './linter'
 import { getChangedFiles } from './git'
-import { Core } from './types'
-
-interface ActionInputs {
-  githubToken: string
-  apiKey: string
-  axeLinterUrl: string
-}
+import type { Core, ActionInputs } from './types'
 
 async function run(core: Core): Promise<void> {
   try {

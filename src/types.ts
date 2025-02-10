@@ -21,3 +21,9 @@ export interface LinterResponse {
   error?: string
   report: LinterReport
 }
+
+export interface ActionInputs {
+  githubToken: string
+  apiKey: string
+  axeLinterUrl: string
+}
