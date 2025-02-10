@@ -3,20 +3,7 @@ import * as sinon from 'sinon'
 import * as core from '@actions/core'
 import nock from 'nock'
 import { lintFiles } from './linter'
-
-interface LinterError {
-  ruleId: string
-  lineNumber: number
-  column: number
-  endColumn: number
-  description: string
-}
-
-interface LinterResponse {
-  report: {
-    errors: LinterError[]
-  }
-}
+import type { LinterResponse } from './types'
 
 type MockResponses = {
   [key: string]: LinterResponse
