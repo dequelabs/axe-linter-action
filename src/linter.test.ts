@@ -172,7 +172,9 @@ describe('linter', () => {
 
     it('should handle linter API errors', async () => {
       const files = ['error.js']
-      readFileStub.withArgs('error.js', 'utf8').resolves('const x = 1;')
+      readFileStub
+        .withArgs('error.js', 'utf8')
+        .resolves('<div><h1>hello world</h1></div>')
 
       const scope = nock(axeLinterUrl).post('/lint-source').reply(200, {
         error: 'API Error'
@@ -207,7 +209,9 @@ describe('linter', () => {
 
     it('should handle network errors', async () => {
       const files = ['test.js']
-      readFileStub.withArgs('test.js', 'utf8').resolves('const x = 1;')
+      readFileStub
+        .withArgs('test.js', 'utf8')
+        .resolves('<div><h1>hello world</h1></div>')
 
       const scope = nock(axeLinterUrl)
         .post('/lint-source')
@@ -225,7 +229,9 @@ describe('linter', () => {
 
     it('should handle HTTP errors', async () => {
       const files = ['test.js']
-      readFileStub.withArgs('test.js', 'utf8').resolves('const x = 1;')
+      readFileStub
+        .withArgs('test.js', 'utf8')
+        .resolves('<div><h1>hello world</h1></div>')
 
       const scope = nock(axeLinterUrl)
         .post('/lint-source')
@@ -242,7 +248,9 @@ describe('linter', () => {
 
     it('should handle malformed API responses', async () => {
       const files = ['test.js']
-      readFileStub.withArgs('test.js', 'utf8').resolves('const x = 1;')
+      readFileStub
+        .withArgs('test.js', 'utf8')
+        .resolves('<div><h1>hello world</h1></div>')
 
       const scope = nock(axeLinterUrl).post('/lint-source').reply(200, {
         report: 'invalid-format'
@@ -260,7 +268,9 @@ describe('linter', () => {
     it('should rethrow non-Error objects', async () => {
       const files = ['test.js']
 
-      readFileStub.withArgs('test.js', 'utf8').resolves('const x = 1;')
+      readFileStub
+        .withArgs('test.js', 'utf8')
+        .resolves('<div><h1>hello world</h1></div>')
       sandbox.replace(require('node-fetch'), 'default', fetchStub)
 
       // Make fetch throw a non-Error object
