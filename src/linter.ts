@@ -61,6 +61,6 @@ export async function lintFiles(
     }
   }
 
-  core.debug(`Found ${totalErrors} errors`)
+  core.debug(`Found ${totalErrors} error${totalErrors === 1 ? '' : 's'}`)
   return totalErrors
 }

@@ -136,6 +136,39 @@ describe('linter', () => {
       )
     })
 
+    it('should handle a single file', async () => {
+      const files = ['test.js']
+      const fileContents = { 'test.js': '<div>test</div>' }
+
+      readFileStub.withArgs('test.js', 'utf8').resolves(fileContents['test.js'])
+
+      const scope = nock(axeLinterUrl)
+        .post('/lint-source')
+        .reply(200, {
+          report: {
+            errors: [
+              {
+                ruleId: 'test-rule-1',
+                lineNumber: 1,
+                column: 1,
+                endColumn: 10,
+                description: 'Test error 1'
+              }
+            ]
+          }
+        })
+
+      const errorCount = await lintFiles(
+        files,
+        apiKey,
+        axeLinterUrl,
+        linterConfig
+      )
+
+      assert.equal(errorCount, 1, 'should return one error for single file')
+      assert.isTrue(scope.isDone(), 'API request should be made')
+    })
+
     it('should skip empty files', async () => {
       const files = ['empty.js']
       readFileStub.withArgs('empty.js', 'utf8').resolves('   ')
