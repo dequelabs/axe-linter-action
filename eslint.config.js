@@ -1,6 +1,7 @@
 const globals = require('globals')
 const eslint = require('@eslint/js')
 const tseslint = require('typescript-eslint')
+const mocha = require('eslint-plugin-mocha')
 
 module.exports = [
   eslint.configs.recommended,
@@ -14,7 +15,8 @@ module.exports = [
       }
     },
     plugins: {
-      '@typescript-eslint': tseslint.plugin
+      '@typescript-eslint': tseslint.plugin,
+      mocha
     }
   },
   {
@@ -28,7 +30,11 @@ module.exports = [
     files: ['src/**/*.test.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-require-imports': 'off'
+      '@typescript-eslint/no-require-imports': 'off',
+      'mocha/no-exclusive-tests': 'error',
+      'mocha/no-setup-in-describe': 'off',
+      'mocha/max-top-level-suites': 'off',
+      'mocha/no-mocha-arrows': 'off'
     }
   },
   {
