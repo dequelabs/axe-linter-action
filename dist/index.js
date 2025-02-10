@@ -42761,7 +42761,9 @@ ${pendingInterceptorsFormatter.format(pending)}
         '**/*.js',
         '**/*.jsx',
         '**/*.tsx',
+        '**/*.esm',
         '**/*.html',
+        '**/*.htm',
         '**/*.vue',
         '**/*.md',
         '**/*.markdown'

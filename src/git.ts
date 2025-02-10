@@ -6,7 +6,9 @@ const FILE_PATTERNS = [
   '**/*.js',
   '**/*.jsx',
   '**/*.tsx',
+  '**/*.esm',
   '**/*.html',
+  '**/*.htm',
   '**/*.vue',
   '**/*.md',
   '**/*.markdown'
