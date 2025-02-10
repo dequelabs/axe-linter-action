@@ -41,14 +41,5 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.23.0"
-  },
-  "lint-staged": {
-    "*.{md,json,js,ts,html}": [
-      "prettier --write"
-    ],
-    "*.{js,ts}": [
-      "eslint --fix",
-      "prettier --write"
-    ]
   }
 }
