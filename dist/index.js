@@ -43040,6 +43040,9 @@ ${pendingInterceptorsFormatter.format(pending)}
               const errors = result.report.errors
               totalErrors += errors.length
               // Report errors using GitHub annotations
+              // There is a limit of 10 warning annotations and 10 error annotations per file
+              // If there are more errors, they will not be reported
+              // https://github.com/orgs/community/discussions/26680
               for (const error of errors) {
                 core.error(`${error.ruleId} - ${error.description}`, {
                   file,
