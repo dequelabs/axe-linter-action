@@ -5,4 +5,4 @@ yarn build
 
 git add .
 
-npx lint-staged
+lint-staged
