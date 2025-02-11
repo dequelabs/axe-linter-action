@@ -1,11 +1,12 @@
 {
-  "name": "axe-linter-action",
+  "name": "@deque/axe-linter-action",
   "version": "1.0.0",
+  "private": true,
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "ncc build src/index.ts --license licenses.txt",
     "lint": "eslint .",
-    "fmt": "prettier --write \"src/**/*.{js,ts,tsx,json,md,css,html}\"",
+    "fmt": "prettier --write .",
     "prepare": "husky",
     "test": "mocha 'src/**/*.test.ts'",
     "coverage": "c8 yarn test"
