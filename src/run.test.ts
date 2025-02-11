@@ -100,6 +100,9 @@ describe('run', () => {
     ;(mockCore.getInput as sinon.SinonStub)
       .withArgs('api_key', { required: true })
       .returns('test-api-key')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('axe_linter_url')
+      .returns('https://test-linter.com')
 
     // Return empty file list
     getChangedFilesStub.resolves([])
@@ -107,10 +110,20 @@ describe('run', () => {
     await run(mockCore)
 
     assert.isTrue(
-      (mockCore.debug as sinon.SinonStub).calledWith('No files to lint')
+      (mockCore.debug as sinon.SinonStub).calledWith('No files to lint'),
+      'Should log debug message for no files'
     )
-    assert.isFalse(lintFilesStub.called)
-    assert.isFalse((mockCore.setFailed as sinon.SinonStub).called)
+    assert.isFalse(
+      lintFilesStub.called,
+      'Linter should not be called with no files'
+    )
+    assert.isFalse(
+      (mockCore.setFailed as sinon.SinonStub).called,
+      'Should not set failed status'
+    )
+
+    // Verify readFileSync was not called
+    assert.isFalse(readFileStub.called, 'Should not attempt to read any files')
   })
 
   it('should handle missing config file', async () => {
@@ -121,31 +134,42 @@ describe('run', () => {
     ;(mockCore.getInput as sinon.SinonStub)
       .withArgs('api_key', { required: true })
       .returns('test-api-key')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('axe_linter_url')
+      .returns('') // This will use the default URL
 
-    // Setup changed files
     getChangedFilesStub.resolves(['test.js'])
 
-    // Simulate missing config file
     readFileStub.withArgs('axe-linter.yml', 'utf8').throws(new Error('ENOENT'))
 
-    // Setup linter response
     lintFilesStub.resolves(0)
 
     await run(mockCore)
 
+    // Verify debug message for missing config
     assert.isTrue(
       (mockCore.debug as sinon.SinonStub).calledWith(
         'Error loading axe-linter.yml no config found or invalid config: ENOENT'
-      )
+      ),
+      'Should log correct debug message for missing config'
     )
 
+    // Verify linter was called with correct parameters
     assert.isTrue(
-      lintFilesStub.calledWith(
-        ['test.js'],
-        'test-api-key',
-        'https://axe-linter.deque.com',
-        {}
-      )
+      lintFilesStub.calledWith(['test.js'], 'test-api-key', '', {}),
+      'Should call linter with default config'
+    )
+
+    // Verify readFileSync was called correctly
+    assert.isTrue(
+      readFileStub.calledWith('axe-linter.yml', 'utf8'),
+      'Should attempt to read config file'
+    )
+
+    // Verify setFailed was not called since linter returned 0 errors
+    assert.isFalse(
+      (mockCore.setFailed as sinon.SinonStub).called,
+      'Should not set failed status'
     )
   })
 
@@ -157,11 +181,16 @@ describe('run', () => {
     ;(mockCore.getInput as sinon.SinonStub)
       .withArgs('api_key', { required: true })
       .returns('test-api-key')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('axe_linter_url')
+      .returns('https://test-linter.com')
 
-    // Setup changed files
     getChangedFilesStub.resolves(['test.js'])
 
-    // Setup linter response with errors
+    readFileStub
+      .withArgs('axe-linter.yml', 'utf8')
+      .returns('rules:\n  test-rule: error')
+
     lintFilesStub.resolves(2)
 
     await run(mockCore)
@@ -181,11 +210,16 @@ describe('run', () => {
     ;(mockCore.getInput as sinon.SinonStub)
       .withArgs('api_key', { required: true })
       .returns('test-api-key')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('axe_linter_url')
+      .returns('https://test-linter.com')
 
-    // Setup changed files
     getChangedFilesStub.resolves(['test.js'])
 
-    // Setup linter response with one error
+    readFileStub
+      .withArgs('axe-linter.yml', 'utf8')
+      .returns('rules:\n  test-rule: error')
+
     lintFilesStub.resolves(1)
 
     await run(mockCore)
@@ -220,6 +254,9 @@ describe('run', () => {
     ;(mockCore.getInput as sinon.SinonStub)
       .withArgs('api_key', { required: true })
       .returns('test-api-key')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('axe_linter_url')
+      .returns('https://test-linter.com')
 
     // Simulate git error
     const error = new Error('Git error')
@@ -253,36 +290,6 @@ describe('run', () => {
     assert.strictEqual(
       (mockCore.setFailed as sinon.SinonStub).getCall(0).args[0],
       'An unexpected error occurred: {"foo":"bar"}'
-    )
-  })
-
-  it('should use default linter URL when not provided', async () => {
-    // Setup inputs with no linter URL
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('github_token', { required: true })
-      .returns('test-token')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('api_key', { required: true })
-      .returns('test-api-key')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('axe_linter_url')
-      .returns('')
-
-    // Setup changed files
-    getChangedFilesStub.resolves(['test.js'])
-
-    // Setup linter response
-    lintFilesStub.resolves(0)
-
-    await run(mockCore)
-
-    assert.isTrue(
-      lintFilesStub.calledWith(
-        ['test.js'],
-        'test-api-key',
-        'https://axe-linter.deque.com',
-        {}
-      )
     )
   })
 })

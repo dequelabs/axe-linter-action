@@ -32,10 +32,12 @@ export async function getChangedFiles(token: string): Promise<string[]> {
 
     return (
       response.data.files
-        ?.filter((file) =>
-          FILE_PATTERNS.some((pattern) =>
-            minimatch(file.filename, pattern, { nocase: true })
-          )
+        ?.filter(
+          (file) =>
+            file.status !== 'removed' &&
+            FILE_PATTERNS.some((pattern) =>
+              minimatch(file.filename, pattern, { nocase: true })
+            )
         )
         .map((file) => file.filename) || []
     )
@@ -48,10 +50,12 @@ export async function getChangedFiles(token: string): Promise<string[]> {
   })
 
   return response.data
-    .filter((file) =>
-      FILE_PATTERNS.some((pattern) =>
-        minimatch(file.filename, pattern, { nocase: true })
-      )
+    .filter(
+      (file) =>
+        file.status !== 'removed' &&
+        FILE_PATTERNS.some((pattern) =>
+          minimatch(file.filename, pattern, { nocase: true })
+        )
     )
     .map((file) => file.filename)
 }

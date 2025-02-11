@@ -192,5 +192,75 @@ describe('git', () => {
         assert.strictEqual(err, error, 'should throw the original error')
       }
     })
+
+    it('should exclude deleted files in pull request', async () => {
+      mockContext.payload.pull_request = { number: 123 }
+
+      const mockFiles = [
+        { filename: 'test.js', status: 'added' },
+        { filename: 'removed.js', status: 'removed' },
+        { filename: 'modified.jsx', status: 'modified' },
+        { filename: 'deleted.md', status: 'removed' },
+        { filename: 'test.tsx', status: 'added' }
+      ]
+
+      mockOctokit.rest.pulls.listFiles.resolves({
+        data: mockFiles
+      })
+
+      const result = await getChangedFiles(token)
+
+      assert.deepEqual(result, ['test.js', 'modified.jsx', 'test.tsx'])
+      assert.notInclude(result, 'removed.js')
+      assert.notInclude(result, 'deleted.md')
+    })
+
+    it('should exclude deleted files in push event', async () => {
+      mockContext.payload.before = 'old-sha'
+      mockContext.payload.after = 'new-sha'
+
+      const mockFiles = [
+        { filename: 'test.vue', status: 'added' },
+        { filename: 'deleted.js', status: 'removed' },
+        { filename: 'test.html', status: 'modified' },
+        { filename: 'removed.md', status: 'removed' }
+      ]
+
+      mockOctokit.rest.repos.compareCommits.resolves({
+        data: {
+          files: mockFiles
+        }
+      })
+
+      const result = await getChangedFiles(token)
+
+      assert.deepEqual(result, ['test.vue', 'test.html'])
+      assert.notInclude(result, 'deleted.js')
+      assert.notInclude(result, 'removed.md')
+      assert.isTrue(
+        debugStub.calledWith('Not a pull request, checking push diff')
+      )
+    })
+
+    it('should handle files with different statuses', async () => {
+      mockContext.payload.pull_request = { number: 123 }
+
+      const mockFiles = [
+        { filename: 'test1.js', status: 'added' },
+        { filename: 'test2.js', status: 'modified' },
+        { filename: 'test3.js', status: 'renamed' },
+        { filename: 'test4.js', status: 'removed' },
+        { filename: 'test5.js', status: 'changed' }
+      ]
+
+      mockOctokit.rest.pulls.listFiles.resolves({
+        data: mockFiles
+      })
+
+      const result = await getChangedFiles(token)
+
+      assert.deepEqual(result, ['test1.js', 'test2.js', 'test3.js', 'test5.js'])
+      assert.notInclude(result, 'test4.js')
+    })
   })
 })

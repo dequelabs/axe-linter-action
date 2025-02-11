@@ -42787,12 +42787,14 @@ ${pendingInterceptorsFormatter.format(pending)}
               ((_a = response.data.files) === null || _a === void 0
                 ? void 0
                 : _a
-                    .filter((file) =>
-                      FILE_PATTERNS.some((pattern) =>
-                        (0, minimatch_1.minimatch)(file.filename, pattern, {
-                          nocase: true
-                        })
-                      )
+                    .filter(
+                      (file) =>
+                        file.status !== 'removed' &&
+                        FILE_PATTERNS.some((pattern) =>
+                          (0, minimatch_1.minimatch)(file.filename, pattern, {
+                            nocase: true
+                          })
+                        )
                     )
                     .map((file) => file.filename)) || []
             )
@@ -42803,12 +42805,14 @@ ${pendingInterceptorsFormatter.format(pending)}
             pull_number: context.payload.pull_request.number
           })
           return response.data
-            .filter((file) =>
-              FILE_PATTERNS.some((pattern) =>
-                (0, minimatch_1.minimatch)(file.filename, pattern, {
-                  nocase: true
-                })
-              )
+            .filter(
+              (file) =>
+                file.status !== 'removed' &&
+                FILE_PATTERNS.some((pattern) =>
+                  (0, minimatch_1.minimatch)(file.filename, pattern, {
+                    nocase: true
+                  })
+                )
             )
             .map((file) => file.filename)
         })
