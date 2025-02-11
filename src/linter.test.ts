@@ -332,5 +332,37 @@ describe('linter', () => {
         )
       }
     })
+
+    it('should handle invalid linter config errors from server', async () => {
+      const files = ['test.js']
+      const invalidLinterConfig = {
+        rules: {
+          'invalid-rule': 'invalid-value'
+        }
+      }
+
+      // Setup file read
+      readFileStub.withArgs('test.js', 'utf8').returns('const x = 1;')
+
+      // Setup Nock to simulate 400 response with config validation error
+      const scope = nock(axeLinterUrl)
+        .post('/lint-source', {
+          source: 'const x = 1;',
+          filename: 'test.js',
+          config: invalidLinterConfig
+        })
+        .matchHeader('content-type', 'application/json')
+        .matchHeader('authorization', apiKey)
+        .replyWithError('Invalid config')
+
+      try {
+        await lintFiles(files, apiKey, axeLinterUrl, invalidLinterConfig)
+        assert.fail('Should have thrown an error')
+      } catch (error) {
+        assert.instanceOf(error, Error)
+        assert.include(error.message, 'Invalid config')
+        assert.isTrue(scope.isDone(), 'API request should be made')
+      }
+    })
   })
 })
