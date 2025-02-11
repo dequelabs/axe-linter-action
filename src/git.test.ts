@@ -6,6 +6,7 @@ import * as core from '@actions/core'
 import { getChangedFiles } from './git'
 
 describe('git', () => {
+  const token = 'test-token'
   let sandbox: sinon.SinonSandbox
   let mockOctokit: any
   let mockContext: any
@@ -47,8 +48,6 @@ describe('git', () => {
   })
 
   describe('getChangedFiles', () => {
-    const token = 'test-token'
-
     it('should handle pull request files', async () => {
       // Setup pull request context
       mockContext.payload.pull_request = { number: 123 }
@@ -261,6 +260,165 @@ describe('git', () => {
 
       assert.deepEqual(result, ['test1.js', 'test2.js', 'test3.js', 'test5.js'])
       assert.notInclude(result, 'test4.js')
+    })
+  })
+  describe('file pattern matching', () => {
+    it('should match JavaScript files correctly', async () => {
+      const mockFiles = [
+        { filename: 'src/app.js', status: 'added' },
+        { filename: 'test/test.js', status: 'modified' },
+        { filename: 'src/components/Button.jsx', status: 'added' },
+        { filename: 'src/utils/helper.esm', status: 'modified' },
+        { filename: 'src/types.ts', status: 'added' }, // Should not match
+        { filename: 'src/styles.css', status: 'modified' } // Should not match
+      ]
+
+      mockOctokit.rest.repos.compareCommits.resolves({
+        data: {
+          files: mockFiles
+        }
+      })
+
+      const result = await getChangedFiles(token)
+
+      assert.includeMembers(result, [
+        'src/app.js',
+        'test/test.js',
+        'src/components/Button.jsx',
+        'src/utils/helper.esm'
+      ])
+      assert.notInclude(result, 'src/types.ts')
+      assert.notInclude(result, 'src/styles.css')
+    })
+
+    it('should match HTML files correctly', async () => {
+      const mockFiles = [
+        { filename: 'index.html', status: 'modified' },
+        { filename: 'public/about.htm', status: 'added' },
+        { filename: 'templates/page.html', status: 'modified' },
+        { filename: 'docs/readme.txt', status: 'added' }, // Should not match
+        { filename: 'styles/main.css', status: 'modified' } // Should not match
+      ]
+
+      mockOctokit.rest.repos.compareCommits.resolves({
+        data: {
+          files: mockFiles
+        }
+      })
+
+      const result = await getChangedFiles(token)
+
+      assert.includeMembers(result, [
+        'index.html',
+        'public/about.htm',
+        'templates/page.html'
+      ])
+      assert.notInclude(result, 'docs/readme.txt')
+      assert.notInclude(result, 'styles/main.css')
+    })
+
+    it('should handle case insensitive matching', async () => {
+      const mockFiles = [
+        { filename: 'src/App.JS', status: 'added' },
+        { filename: 'src/Component.JSX', status: 'modified' },
+        { filename: 'docs/README.MD', status: 'added' },
+        { filename: 'docs/test.MaRkDoWn', status: 'added' },
+        { filename: 'public/INDEX.HTML', status: 'modified' },
+        { filename: 'src/Test.VUE', status: 'added' }
+      ]
+
+      mockOctokit.rest.repos.compareCommits.resolves({
+        data: {
+          files: mockFiles
+        }
+      })
+
+      const result = await getChangedFiles(token)
+
+      assert.includeMembers(result, [
+        'src/App.JS',
+        'src/Component.JSX',
+        'docs/README.MD',
+        'docs/test.MaRkDoWn',
+        'public/INDEX.HTML',
+        'src/Test.VUE'
+      ])
+    })
+
+    it('should handle nested paths correctly', async () => {
+      const mockFiles = [
+        { filename: 'deeply/nested/path/component.jsx', status: 'added' },
+        { filename: 'very/deep/structure/util.js', status: 'modified' },
+        { filename: 'nested/docs/guide.md', status: 'added' },
+        { filename: 'a/b/c/d/e/f/page.html', status: 'modified' },
+        { filename: 'deep/path/app.vue', status: 'added' }
+      ]
+
+      mockOctokit.rest.repos.compareCommits.resolves({
+        data: {
+          files: mockFiles
+        }
+      })
+
+      const result = await getChangedFiles(token)
+
+      assert.includeMembers(result, [
+        'deeply/nested/path/component.jsx',
+        'very/deep/structure/util.js',
+        'nested/docs/guide.md',
+        'a/b/c/d/e/f/page.html',
+        'deep/path/app.vue'
+      ])
+    })
+
+    it('should handle files without extensions correctly', async () => {
+      const mockFiles = [
+        { filename: 'README', status: 'modified' }, // Should not match
+        { filename: 'LICENSE', status: 'added' }, // Should not match
+        { filename: 'docs/markdown', status: 'modified' }, // Should not match
+        { filename: 'test.html', status: 'added' }, // Should match
+        { filename: 'test.', status: 'modified' } // Should not match
+      ]
+
+      mockOctokit.rest.repos.compareCommits.resolves({
+        data: {
+          files: mockFiles
+        }
+      })
+
+      const result = await getChangedFiles(token)
+
+      assert.includeMembers(result, ['test.html'])
+      assert.notInclude(result, 'README')
+      assert.notInclude(result, 'LICENSE')
+      assert.notInclude(result, 'docs/markdown')
+      assert.notInclude(result, 'test.')
+    })
+
+    it('should handle push event diff correctly', async () => {
+      // Setup push event context
+      mockContext.payload = {
+        before: 'old-sha',
+        after: 'new-sha'
+      }
+
+      const mockFiles = [
+        { filename: 'src/app.js', status: 'added' },
+        { filename: 'test/test.jsx', status: 'modified' }
+      ]
+
+      // Setup compareCommits response
+      mockOctokit.rest.repos = {
+        compareCommits: sandbox.stub().resolves({
+          data: {
+            files: mockFiles
+          }
+        })
+      }
+
+      const result = await getChangedFiles(token)
+
+      assert.includeMembers(result, ['src/app.js', 'test/test.jsx'])
     })
   })
 })
