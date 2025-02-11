@@ -43134,13 +43134,10 @@ ${pendingInterceptorsFormatter.format(pending)}
             const inputs = {
               githubToken: core.getInput('github_token', { required: true }),
               apiKey: core.getInput('api_key', { required: true }),
-              axeLinterUrl:
-                core.getInput('axe_linter_url') ||
-                'https://axe-linter.deque.com'
+              axeLinterUrl: core.getInput('axe_linter_url')
             }
             // Remove trailing slash if present
             inputs.axeLinterUrl = inputs.axeLinterUrl.replace(/\/$/, '')
-            // Get changed files
             const changedFiles = yield (0, git_1.getChangedFiles)(
               inputs.githubToken
             )
