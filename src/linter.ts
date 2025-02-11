@@ -1,7 +1,8 @@
 import * as core from '@actions/core'
-import { readFile } from 'fs/promises'
+import { readFileSync } from 'fs'
 import type { LinterResponse } from './types'
 import fetch from 'node-fetch'
+import { pluralize } from './utils'
 
 export async function lintFiles(
   files: string[],
@@ -12,58 +13,61 @@ export async function lintFiles(
   let totalErrors = 0
 
   for (const file of files) {
-    try {
-      const fileContents = await readFile(file, 'utf8')
+    const fileContents = readFileSync(file, 'utf8')
 
-      // Skip empty files
-      if (!fileContents.trim()) {
-        core.debug(`Skipping empty file ${file}`)
-        continue
-      }
+    // Skip empty files
+    if (!fileContents.trim()) {
+      core.debug(`Skipping empty file ${file}`)
+      continue
+    }
 
-      const response = await fetch(`${axeLinterUrl}/lint-source`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: apiKey
-        },
-        body: JSON.stringify({
-          source: fileContents,
-          filename: file,
-          config: linterConfig
-        })
+    const response = await fetch(`${axeLinterUrl}/lint-source`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: apiKey
+      },
+      body: JSON.stringify({
+        source: fileContents,
+        filename: file,
+        config: linterConfig
       })
+    })
 
-      const result = (await response.json()) as LinterResponse
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
 
-      if (result.error) {
-        throw new Error(result.error)
-      }
+    const contentType = response.headers.get('content-type')
 
-      const errors = result.report.errors
-      totalErrors += errors.length
+    if (!contentType?.includes('application/json')) {
+      throw new Error('Invalid content type')
+    }
 
-      // Report errors using GitHub annotations
-      // There is a limit of 10 warning annotations and 10 error annotations per step
-      // If there are more errors, they will not be reported
-      // https://github.com/orgs/community/discussions/26680
-      for (const error of errors) {
-        core.error(`${error.ruleId} - ${error.description}`, {
-          file,
-          startLine: error.lineNumber,
-          startColumn: error.column,
-          endColumn: error.endColumn,
-          title: 'Axe Linter'
-        })
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Error processing ${file}: ${error.message}`)
-      }
-      throw error
+    const result = (await response.json()) as LinterResponse
+
+    if (result.error) {
+      throw new Error(result.error)
+    }
+
+    const errors = result.report.errors
+    totalErrors += errors.length
+
+    // Report errors using GitHub annotations
+    // There is a limit of 10 warning annotations and 10 error annotations per step
+    // If there are more errors, they will not be reported
+    // https://github.com/orgs/community/discussions/26680
+    for (const error of errors) {
+      core.error(`${error.ruleId} - ${error.description}`, {
+        file,
+        startLine: error.lineNumber,
+        startColumn: error.column,
+        endColumn: error.endColumn,
+        title: 'Axe Linter'
+      })
     }
   }
 
-  core.debug(`Found ${totalErrors} error${totalErrors === 1 ? '' : 's'}`)
+  core.debug(`Found ${totalErrors} error${pluralize(totalErrors)}`)
   return totalErrors
 }

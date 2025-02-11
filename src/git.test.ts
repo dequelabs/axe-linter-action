@@ -1,3 +1,4 @@
+import 'mocha'
 import { assert } from 'chai'
 import sinon from 'sinon'
 import * as github from '@actions/github'
@@ -176,7 +177,6 @@ describe('git', () => {
 
       assert.isArray(result, 'should return an array')
       assert.isEmpty(result, 'should return empty array')
-      assert.lengthOf(result, 0, 'should have no matching files')
     })
 
     it('should throw an error when API call fails', async () => {

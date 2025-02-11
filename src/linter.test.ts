@@ -1,3 +1,4 @@
+import 'mocha'
 import { assert } from 'chai'
 import * as sinon from 'sinon'
 import * as core from '@actions/core'
@@ -5,9 +6,7 @@ import nock from 'nock'
 import { lintFiles } from './linter'
 import type { LinterResponse } from './types'
 
-type MockResponses = {
-  [key: string]: LinterResponse
-}
+type MockResponses = Record<string, LinterResponse>
 
 describe('linter', () => {
   let sandbox: sinon.SinonSandbox
@@ -25,7 +24,7 @@ describe('linter', () => {
 
     // Stub file system
     readFileStub = sandbox.stub()
-    sandbox.replace(require('fs/promises'), 'readFile', readFileStub)
+    sandbox.replace(require('fs'), 'readFileSync', readFileStub)
 
     // Stub fetch
     fetchStub = sandbox.stub()
@@ -54,7 +53,7 @@ describe('linter', () => {
 
       // Mock file reads
       for (const file of files) {
-        readFileStub.withArgs(file, 'utf8').resolves(fileContents[file])
+        readFileStub.withArgs(file, 'utf8').returns(fileContents[file])
       }
 
       // Mock linter responses
@@ -140,7 +139,7 @@ describe('linter', () => {
       const files = ['test.js']
       const fileContents = { 'test.js': '<div>test</div>' }
 
-      readFileStub.withArgs('test.js', 'utf8').resolves(fileContents['test.js'])
+      readFileStub.withArgs('test.js', 'utf8').returns(fileContents['test.js'])
 
       const scope = nock(axeLinterUrl)
         .post('/lint-source')
@@ -171,7 +170,7 @@ describe('linter', () => {
 
     it('should skip empty files', async () => {
       const files = ['empty.js']
-      readFileStub.withArgs('empty.js', 'utf8').resolves('   ')
+      readFileStub.withArgs('empty.js', 'utf8').returns('   ')
 
       const scope = nock(axeLinterUrl).post('/lint-source').reply(200)
 
@@ -194,7 +193,7 @@ describe('linter', () => {
       const files = ['error.js']
       readFileStub
         .withArgs('error.js', 'utf8')
-        .resolves('<div><h1>hello world</h1></div>')
+        .returns('<div><h1>hello world</h1></div>')
 
       const scope = nock(axeLinterUrl).post('/lint-source').reply(200, {
         error: 'API Error'
@@ -205,7 +204,7 @@ describe('linter', () => {
         assert.fail('should have thrown an error')
       } catch (error) {
         assert.instanceOf(error, Error)
-        assert.equal(error.message, 'Error processing error.js: API Error')
+        assert.equal(error.message, 'API Error')
         assert.isTrue(scope.isDone(), 'API request should be made')
       }
     })
@@ -213,7 +212,7 @@ describe('linter', () => {
     it('should handle file read errors', async () => {
       const files = ['nonexistent.js']
       const fileError = new Error('ENOENT')
-      readFileStub.rejects(fileError)
+      readFileStub.throws(fileError)
 
       const scope = nock(axeLinterUrl).post('/lint-source').reply(200)
 
@@ -222,7 +221,7 @@ describe('linter', () => {
         assert.fail('should have thrown an error')
       } catch (error) {
         assert.instanceOf(error, Error)
-        assert.equal(error.message, 'Error processing nonexistent.js: ENOENT')
+        assert.equal(error.message, 'ENOENT')
         assert.isFalse(scope.isDone(), 'no HTTP requests should be made')
       }
     })
@@ -231,7 +230,7 @@ describe('linter', () => {
       const files = ['test.js']
       readFileStub
         .withArgs('test.js', 'utf8')
-        .resolves('<div><h1>hello world</h1></div>')
+        .returns('<div><h1>hello world</h1></div>')
 
       const scope = nock(axeLinterUrl)
         .post('/lint-source')
@@ -251,7 +250,7 @@ describe('linter', () => {
       const files = ['test.js']
       readFileStub
         .withArgs('test.js', 'utf8')
-        .resolves('<div><h1>hello world</h1></div>')
+        .returns('<div><h1>hello world</h1></div>')
 
       const scope = nock(axeLinterUrl)
         .post('/lint-source')
@@ -270,7 +269,7 @@ describe('linter', () => {
       const files = ['test.js']
       readFileStub
         .withArgs('test.js', 'utf8')
-        .resolves('<div><h1>hello world</h1></div>')
+        .returns('<div><h1>hello world</h1></div>')
 
       const scope = nock(axeLinterUrl).post('/lint-source').reply(200, {
         report: 'invalid-format'
@@ -290,7 +289,7 @@ describe('linter', () => {
 
       readFileStub
         .withArgs('test.js', 'utf8')
-        .resolves('<div><h1>hello world</h1></div>')
+        .returns('<div><h1>hello world</h1></div>')
       sandbox.replace(require('node-fetch'), 'default', fetchStub)
 
       // Make fetch throw a non-Error object
@@ -312,7 +311,7 @@ describe('linter', () => {
           'Error should not be an Error instance'
         )
         assert.deepEqual(
-          error as any,
+          error,
           nonErrorObject,
           'Should be the original non-Error object'
         )

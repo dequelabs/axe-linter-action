@@ -1,3 +1,4 @@
+import 'mocha'
 import { assert } from 'chai'
 import * as sinon from 'sinon'
 import * as yaml from 'js-yaml'
@@ -27,7 +28,7 @@ describe('run', () => {
 
     // Stub file system
     readFileStub = sandbox.stub()
-    sandbox.replace(require('fs/promises'), 'readFile', readFileStub)
+    sandbox.replace(require('fs'), 'readFileSync', readFileStub)
 
     // Stub git and linter functions
     getChangedFilesStub = sandbox.stub(gitModule, 'getChangedFiles')
@@ -57,7 +58,7 @@ describe('run', () => {
     const mockConfig = { rules: { 'test-rule': 'error' } }
     readFileStub
       .withArgs('axe-linter.yml', 'utf8')
-      .resolves(yaml.dump(mockConfig))
+      .returns(yaml.dump(mockConfig))
 
     // Setup linter response
     lintFilesStub.resolves(0)
@@ -77,6 +78,7 @@ describe('run', () => {
     )
     // Verify files were processed
     assert.isTrue(getChangedFilesStub.calledWith('test-token'))
+
     assert.isTrue(
       lintFilesStub.calledWith(
         ['test.js', 'test.html'],
@@ -105,7 +107,7 @@ describe('run', () => {
     await run(mockCore)
 
     assert.isTrue(
-      (mockCore.info as sinon.SinonStub).calledWith('No files to lint')
+      (mockCore.debug as sinon.SinonStub).calledWith('No files to lint')
     )
     assert.isFalse(lintFilesStub.called)
     assert.isFalse((mockCore.setFailed as sinon.SinonStub).called)
@@ -124,7 +126,7 @@ describe('run', () => {
     getChangedFilesStub.resolves(['test.js'])
 
     // Simulate missing config file
-    readFileStub.withArgs('axe-linter.yml', 'utf8').rejects(new Error('ENOENT'))
+    readFileStub.withArgs('axe-linter.yml', 'utf8').throws(new Error('ENOENT'))
 
     // Setup linter response
     lintFilesStub.resolves(0)
@@ -133,9 +135,10 @@ describe('run', () => {
 
     assert.isTrue(
       (mockCore.debug as sinon.SinonStub).calledWith(
-        'No axe-linter.yml found or empty config'
+        'Error loading axe-linter.yml no config found or invalid config: ENOENT'
       )
     )
+
     assert.isTrue(
       lintFilesStub.calledWith(
         ['test.js'],
@@ -249,7 +252,7 @@ describe('run', () => {
     // Verify setFailed was called with the correct message
     assert.strictEqual(
       (mockCore.setFailed as sinon.SinonStub).getCall(0).args[0],
-      'An unexpected error occurred'
+      'An unexpected error occurred: {"foo":"bar"}'
     )
   })
 

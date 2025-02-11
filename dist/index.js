@@ -42789,7 +42789,9 @@ ${pendingInterceptorsFormatter.format(pending)}
                 : _a
                     .filter((file) =>
                       FILE_PATTERNS.some((pattern) =>
-                        (0, minimatch_1.minimatch)(file.filename, pattern)
+                        (0, minimatch_1.minimatch)(file.filename, pattern, {
+                          nocase: true
+                        })
                       )
                     )
                     .map((file) => file.filename)) || []
@@ -42803,7 +42805,9 @@ ${pendingInterceptorsFormatter.format(pending)}
           return response.data
             .filter((file) =>
               FILE_PATTERNS.some((pattern) =>
-                (0, minimatch_1.minimatch)(file.filename, pattern)
+                (0, minimatch_1.minimatch)(file.filename, pattern, {
+                  nocase: true
+                })
               )
             )
             .map((file) => file.filename)
@@ -43007,62 +43011,67 @@ ${pendingInterceptorsFormatter.format(pending)}
       Object.defineProperty(exports, '__esModule', { value: true })
       exports.lintFiles = lintFiles
       const core = __importStar(__nccwpck_require__(7484))
-      const promises_1 = __nccwpck_require__(1943)
+      const fs_1 = __nccwpck_require__(9896)
       const node_fetch_1 = __importDefault(__nccwpck_require__(6705))
+      const utils_1 = __nccwpck_require__(1798)
       function lintFiles(files, apiKey, axeLinterUrl, linterConfig) {
         return __awaiter(this, void 0, void 0, function* () {
           let totalErrors = 0
           for (const file of files) {
-            try {
-              const fileContents = yield (0, promises_1.readFile)(file, 'utf8')
-              // Skip empty files
-              if (!fileContents.trim()) {
-                core.debug(`Skipping empty file ${file}`)
-                continue
-              }
-              const response = yield (0, node_fetch_1.default)(
-                `${axeLinterUrl}/lint-source`,
-                {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: apiKey
-                  },
-                  body: JSON.stringify({
-                    source: fileContents,
-                    filename: file,
-                    config: linterConfig
-                  })
-                }
-              )
-              const result = yield response.json()
-              if (result.error) {
-                throw new Error(result.error)
-              }
-              const errors = result.report.errors
-              totalErrors += errors.length
-              // Report errors using GitHub annotations
-              // There is a limit of 10 warning annotations and 10 error annotations per step
-              // If there are more errors, they will not be reported
-              // https://github.com/orgs/community/discussions/26680
-              for (const error of errors) {
-                core.error(`${error.ruleId} - ${error.description}`, {
-                  file,
-                  startLine: error.lineNumber,
-                  startColumn: error.column,
-                  endColumn: error.endColumn,
-                  title: 'Axe Linter'
+            const fileContents = (0, fs_1.readFileSync)(file, 'utf8')
+            // Skip empty files
+            if (!fileContents.trim()) {
+              core.debug(`Skipping empty file ${file}`)
+              continue
+            }
+            const response = yield (0, node_fetch_1.default)(
+              `${axeLinterUrl}/lint-source`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: apiKey
+                },
+                body: JSON.stringify({
+                  source: fileContents,
+                  filename: file,
+                  config: linterConfig
                 })
               }
-            } catch (error) {
-              if (error instanceof Error) {
-                throw new Error(`Error processing ${file}: ${error.message}`)
-              }
-              throw error
+            )
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`)
+            }
+            const contentType = response.headers.get('content-type')
+            if (
+              !(contentType === null || contentType === void 0
+                ? void 0
+                : contentType.includes('application/json'))
+            ) {
+              throw new Error('Invalid content type')
+            }
+            const result = yield response.json()
+            if (result.error) {
+              throw new Error(result.error)
+            }
+            const errors = result.report.errors
+            totalErrors += errors.length
+            // Report errors using GitHub annotations
+            // There is a limit of 10 warning annotations and 10 error annotations per step
+            // If there are more errors, they will not be reported
+            // https://github.com/orgs/community/discussions/26680
+            for (const error of errors) {
+              core.error(`${error.ruleId} - ${error.description}`, {
+                file,
+                startLine: error.lineNumber,
+                startColumn: error.column,
+                endColumn: error.endColumn,
+                title: 'Axe Linter'
+              })
             }
           }
           core.debug(
-            `Found ${totalErrors} error${totalErrors === 1 ? '' : 's'}`
+            `Found ${totalErrors} error${(0, utils_1.pluralize)(totalErrors)}`
           )
           return totalErrors
         })
@@ -43114,10 +43123,11 @@ ${pendingInterceptorsFormatter.format(pending)}
           })
         }
       Object.defineProperty(exports, '__esModule', { value: true })
-      const promises_1 = __nccwpck_require__(1943)
+      const fs_1 = __nccwpck_require__(9896)
       const js_yaml_1 = __nccwpck_require__(4281)
       const linter_1 = __nccwpck_require__(5761)
       const git_1 = __nccwpck_require__(1243)
+      const utils_1 = __nccwpck_require__(1798)
       function run(core) {
         return __awaiter(this, void 0, void 0, function* () {
           try {
@@ -43135,13 +43145,13 @@ ${pendingInterceptorsFormatter.format(pending)}
               inputs.githubToken
             )
             if (changedFiles.length === 0) {
-              core.info('No files to lint')
+              core.debug('No files to lint')
               return
             }
             // Load linter config if exists
             let linterConfig = {}
             try {
-              const configFile = yield (0, promises_1.readFile)(
+              const configFile = (0, fs_1.readFileSync)(
                 'axe-linter.yml',
                 'utf8'
               )
@@ -43149,8 +43159,17 @@ ${pendingInterceptorsFormatter.format(pending)}
               if (parsedConfig && typeof parsedConfig === 'object') {
                 linterConfig = parsedConfig
               }
-            } catch (_a) {
-              core.debug('No axe-linter.yml found or empty config')
+            } catch (error) {
+              if (error instanceof Error) {
+                core.debug(
+                  `Error loading axe-linter.yml no config found or invalid config: ${error.message}`
+                )
+              } else {
+                core.debug(
+                  'Error loading axe-linter.yml no config found or invalid config: ' +
+                    error
+                )
+              }
             }
             // Run linter
             const errorCount = yield (0, linter_1.lintFiles)(
@@ -43161,19 +43180,33 @@ ${pendingInterceptorsFormatter.format(pending)}
             )
             if (errorCount > 0) {
               core.setFailed(
-                `Found ${errorCount} accessibility issue${errorCount === 1 ? '' : 's'}`
+                `Found ${errorCount} accessibility issue${(0, utils_1.pluralize)(errorCount)}`
               )
             }
           } catch (error) {
             if (error instanceof Error) {
               core.setFailed(error.message)
             } else {
-              core.setFailed('An unexpected error occurred')
+              core.setFailed(
+                'An unexpected error occurred: ' + JSON.stringify(error)
+              )
             }
           }
         })
       }
       exports['default'] = run
+
+      /***/
+    },
+
+    /***/ 1798: /***/ (__unused_webpack_module, exports) => {
+      'use strict'
+
+      Object.defineProperty(exports, '__esModule', { value: true })
+      exports.pluralize = pluralize
+      function pluralize(count) {
+        return count === 1 ? '' : 's'
+      }
 
       /***/
     },
@@ -43243,13 +43276,6 @@ ${pendingInterceptorsFormatter.format(pending)}
     /***/ 9896: /***/ (module) => {
       'use strict'
       module.exports = require('fs')
-
-      /***/
-    },
-
-    /***/ 1943: /***/ (module) => {
-      'use strict'
-      module.exports = require('fs/promises')
 
       /***/
     },
