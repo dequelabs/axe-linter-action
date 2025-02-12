@@ -1,8 +1,8 @@
 name: Run axe Accessibility Linter
 description: Lints all changed files using the axe DevTools Linter
 branding:
-  icon: "check-circle"
-  color: "blue"
+  icon: 'check-circle'
+  color: 'blue'
 inputs:
   github_token:
     description: Github Token
@@ -15,30 +15,5 @@ inputs:
     required: false
     default: https://axe-linter.deque.com
 runs:
-  using: "composite"
-  steps:
-    - uses: actions/checkout@v4
-    - uses: mikefarah/yq@4839dbbf80445070a31c7a9c1055da527db2d5ee
-    - name: Get changed files
-      id: changed_files
-      env:
-        GITHUB_TOKEN: ${{ inputs.github_token }}
-      uses: tj-actions/changed-files@bab30c2299617f6615ec02a68b9a40d10bd21366
-      with:
-        files: |
-          **/*.js
-          **/*.jsx
-          **/*.tsx
-          **/*.html
-          **/*.vue
-          **/*.md
-          **/*.markdown
-    - name: Run axe linter
-      if: steps.changed_files.outputs.any_changed == 'true'
-      run: ${{ github.action_path }}/axe-linter.sh
-      env:
-        GITHUB_TOKEN: ${{ inputs.github_token }}
-        API_KEY: ${{ inputs.api_key }}
-        CHANGED_FILES: ${{ steps.changed_files.outputs.all_changed_files }}
-        AXE_LINTER_URL: ${{ inputs.axe_linter_url }}
-      shell: bash
+  using: 'node20'
+  main: 'dist/index.js'
