@@ -5,6 +5,15 @@ export type Core = Pick<
   'getInput' | 'setOutput' | 'info' | 'setFailed' | 'debug'
 >
 
+export interface ErrorDetail {
+  line: number
+  message: string
+  column: number
+  endColumn: number
+  ruleId: string
+  description: string
+}
+
 export interface LinterError {
   ruleId: string
   lineNumber: number
