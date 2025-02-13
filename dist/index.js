@@ -43091,13 +43091,16 @@ ${pendingInterceptorsFormatter.format(pending)}
                 .addBreak()
               // Create GitHub annotations
               for (const error of errors) {
-                core.error(`${error.ruleId} - ${error.description}`, {
-                  file,
-                  startLine: error.line,
-                  startColumn: error.column,
-                  endColumn: error.endColumn,
-                  title: 'Axe Linter'
-                })
+                core.error(
+                  `${file}:${error.line} - ${error.ruleId} - ${error.description}`,
+                  {
+                    file,
+                    startLine: error.line,
+                    startColumn: error.column,
+                    endColumn: error.endColumn,
+                    title: 'Axe Linter'
+                  }
+                )
               }
             }
           }

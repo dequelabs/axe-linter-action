@@ -493,7 +493,7 @@ describe('linter', () => {
       )
       assert.isTrue(
         errorStub.calledWith(
-          'click-handler - Click handler should have keyboard equivalent',
+          'app.js:1 - click-handler - Click handler should have keyboard equivalent',
           {
             file: 'app.js',
             startLine: 1,
