@@ -72,13 +72,15 @@ export async function lintFiles(
     if (errors.length > 0) {
       // Add file heading
       core.summary
-        .addHeading(`Errors in ${file}:`, 3)
+        .addHeading(`Error${pluralize(errors.length)} in ${file}:`, 2)
+        .addRaw('<span style="color: red">', true)
         .addList(
           errors.map(
             (error) =>
               `Line ${error.line}: ${error.ruleId} - ${error.description}`
           )
         )
+        .addRaw('</span>', true)
         .addBreak()
 
       // Create GitHub annotations

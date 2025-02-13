@@ -43021,7 +43021,7 @@ ${pendingInterceptorsFormatter.format(pending)}
       function lintFiles(files, apiKey, axeLinterUrl, linterConfig) {
         return __awaiter(this, void 0, void 0, function* () {
           let totalErrors = 0
-          let fileErrors = {}
+          const fileErrors = {}
           for (const file of files) {
             const fileContents = (0, fs_1.readFileSync)(file, 'utf8')
             // Skip empty files
@@ -43078,13 +43078,18 @@ ${pendingInterceptorsFormatter.format(pending)}
             if (errors.length > 0) {
               // Add file heading
               core.summary
-                .addHeading(`Errors in ${file}:`, 3)
+                .addHeading(
+                  `Error${(0, utils_1.pluralize)(errors.length)} in ${file}:`,
+                  2
+                )
+                .addRaw('<span style="color: red">', true)
                 .addList(
                   errors.map(
                     (error) =>
                       `Line ${error.line}: ${error.ruleId} - ${error.description}`
                   )
                 )
+                .addRaw('</span>', true)
                 .addBreak()
               // Create GitHub annotations
               for (const error of errors) {
