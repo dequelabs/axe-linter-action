@@ -43079,17 +43079,15 @@ ${pendingInterceptorsFormatter.format(pending)}
               // Add file heading
               core.summary
                 .addHeading(
-                  `Error${(0, utils_1.pluralize)(errors.length)} in ${file}:`,
+                  `❌ Error${(0, utils_1.pluralize)(errors.length)} in ${file}:`,
                   2
                 )
-                .addRaw('<span style="color: red">', true)
                 .addList(
                   errors.map(
                     (error) =>
-                      `Line ${error.line}: ${error.ruleId} - ${error.description}`
+                      `🔴 Line ${error.line}: ${error.ruleId} - ${error.description}`
                   )
                 )
-                .addRaw('</span>', true)
                 .addBreak()
               // Create GitHub annotations
               for (const error of errors) {

@@ -452,21 +452,22 @@ describe('linter', () => {
 
       // Verify file sections
       assert.isTrue(
-        summaryStub.addHeading.calledWith('Error in app.js:', 3),
+        summaryStub.addHeading.calledWith('❌ Error in app.js:', 2),
         'Should add app.js section'
       )
+
       assert.isTrue(
-        summaryStub.addHeading.calledWith('Errors in index.html:', 3),
+        summaryStub.addHeading.calledWith('❌ Errors in index.html:', 2),
         'Should add index.html section'
       )
 
       // Verify error lists
       const appJsErrors = [
-        'Line 1: click-handler - Click handler should have keyboard equivalent'
+        '🔴 Line 1: click-handler - Click handler should have keyboard equivalent'
       ]
       const indexHtmlErrors = [
-        'Line 1: color-contrast - Element has insufficient color contrast',
-        'Line 1: aria-label - Element should have aria-label'
+        '🔴 Line 1: color-contrast - Element has insufficient color contrast',
+        '🔴 Line 1: aria-label - Element should have aria-label'
       ]
 
       assert.isTrue(
