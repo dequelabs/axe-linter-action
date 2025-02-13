@@ -124,7 +124,7 @@ describe('linter', () => {
 
       // Verify error reporting
       assert.isTrue(
-        errorStub.calledWith('test-rule-1 - Test error 1', {
+        errorStub.calledWith('test.js:1 - test-rule-1 - Test error 1', {
           file: 'test.js',
           startLine: 1,
           startColumn: 1,
@@ -135,7 +135,7 @@ describe('linter', () => {
       )
 
       assert.isTrue(
-        errorStub.calledWith('test-rule-2 - Test error 2', {
+        errorStub.calledWith('test.html:1 - test-rule-2 - Test error 2', {
           file: 'test.html',
           startLine: 1,
           startColumn: 1,
