@@ -9,6 +9,7 @@ const FILE_PATTERNS = [
   '**/*.esm',
   '**/*.html',
   '**/*.htm',
+  '**/*.xhtml',
   '**/*.vue',
   '**/*.md',
   '**/*.markdown'
