@@ -24,8 +24,7 @@ export async function lintFiles(
     const response = await fetch(`${axeLinterUrl}/lint-source`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: apiKey
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         source: fileContents,

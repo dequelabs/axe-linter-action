@@ -9,7 +9,7 @@ inputs:
     required: true
   api_key:
     description: axe Linter API Key
-    required: true
+    required: false
   axe_linter_url:
     description: axe Linter URL
     required: false

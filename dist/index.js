@@ -43033,8 +43033,7 @@ ${pendingInterceptorsFormatter.format(pending)}
               {
                 method: 'POST',
                 headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: apiKey
+                  'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                   source: fileContents,
