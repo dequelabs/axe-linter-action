@@ -34,3 +34,14 @@ jobs:
           api_key: ${{ secrets.AXE_LINTER_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+## Limitation
+
+There is a limitation on the amount of annotations that can be made per step.
+
+- 10 warning annotations
+- 10 error annotations
+
+If there are more errors, they will not be reported. If you would like to view the errors please view the action logs.
+
+Additional information can be found in [this GitHub discussion](https://github.com/orgs/community/discussions/26680).
