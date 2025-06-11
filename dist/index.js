@@ -43044,7 +43044,15 @@ ${pendingInterceptorsFormatter.format(pending)}
               }
             )
             if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`)
+              try {
+                const errorText = yield response.text()
+                throw new Error(
+                  `HTTP error! status: ${response.status}, body: ${errorText}`
+                )
+              } catch (_a) {
+                // If reading text fails, continue with original error
+                throw new Error(`HTTP error! status: ${response.status}`)
+              }
             }
             const contentType = response.headers.get('content-type')
             if (
