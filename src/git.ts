@@ -1,5 +1,5 @@
-import * as github from '@actions/github'
 import * as core from '@actions/core'
+import * as github from '@actions/github'
 import { minimatch } from 'minimatch'
 
 const FILE_PATTERNS = [
@@ -37,17 +37,14 @@ export async function getChangedFiles(token: string): Promise<string[]> {
     const base = context.payload.before
     const head = context.payload.after
 
-    return octokit.paginate(
-      octokit.rest.repos.compareCommits,
-      {
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        base,
-        head,
-        per_page: PAGE_SIZE
-      },
-      (response) => filterFiles(response.data.files || [])
-    )
+    const response = await octokit.rest.repos.compareCommits({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      base,
+      head
+    })
+
+    return filterFiles(response.data.files ?? [])
   }
 
   return octokit.paginate(

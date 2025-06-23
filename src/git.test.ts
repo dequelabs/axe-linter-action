@@ -118,8 +118,7 @@ describe('git', () => {
           owner: 'test-owner',
           repo: 'test-repo',
           base: 'old-sha',
-          head: 'new-sha',
-          per_page: 100
+          head: 'new-sha'
         }),
         'compareCommits should be called with correct parameters'
       )
