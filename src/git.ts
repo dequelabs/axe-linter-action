@@ -14,6 +14,20 @@ const FILE_PATTERNS = [
   '**/*.markdown'
 ] as const
 
+const PAGE_SIZE = 100
+
+function filterFiles(files: { filename: string; status: string }[]): string[] {
+  return files
+    .filter(
+      (file) =>
+        file.status !== 'removed' &&
+        FILE_PATTERNS.some((pattern) =>
+          minimatch(file.filename, pattern, { nocase: true })
+        )
+    )
+    .map((file) => file.filename)
+}
+
 export async function getChangedFiles(token: string): Promise<string[]> {
   const octokit = github.getOctokit(token)
   const { context } = github
@@ -23,39 +37,27 @@ export async function getChangedFiles(token: string): Promise<string[]> {
     const base = context.payload.before
     const head = context.payload.after
 
-    const response = await octokit.rest.repos.compareCommits({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      base,
-      head
-    })
-
-    return (
-      response.data.files
-        ?.filter(
-          (file) =>
-            file.status !== 'removed' &&
-            FILE_PATTERNS.some((pattern) =>
-              minimatch(file.filename, pattern, { nocase: true })
-            )
-        )
-        .map((file) => file.filename) || []
+    return octokit.paginate(
+      octokit.rest.repos.compareCommits,
+      {
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        base,
+        head,
+        per_page: PAGE_SIZE
+      },
+      (response) => filterFiles(response.data.files || [])
     )
   }
 
-  const response = await octokit.rest.pulls.listFiles({
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    pull_number: context.payload.pull_request.number
-  })
-
-  return response.data
-    .filter(
-      (file) =>
-        file.status !== 'removed' &&
-        FILE_PATTERNS.some((pattern) =>
-          minimatch(file.filename, pattern, { nocase: true })
-        )
-    )
-    .map((file) => file.filename)
+  return octokit.paginate(
+    octokit.rest.pulls.listFiles,
+    {
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      pull_number: context.payload.pull_request.number,
+      per_page: PAGE_SIZE
+    },
+    (response) => filterFiles(response.data)
+  )
 }
