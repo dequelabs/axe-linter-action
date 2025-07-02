@@ -12,6 +12,7 @@ describe('linter', () => {
   let sandbox: sinon.SinonSandbox
   let errorStub: sinon.SinonStub
   let debugStub: sinon.SinonStub
+  let summaryStub: any
   let readFileStub: sinon.SinonStub
   let fetchStub: sinon.SinonStub
 
@@ -21,6 +22,16 @@ describe('linter', () => {
     // Stub core functions
     errorStub = sandbox.stub(core, 'error')
     debugStub = sandbox.stub(core, 'debug')
+
+    // Create summary stub with chainable methods
+    summaryStub = {
+      addHeading: sandbox.stub().returnsThis(),
+      addBreak: sandbox.stub().returnsThis(),
+      addList: sandbox.stub().returnsThis(),
+      addRaw: sandbox.stub().returnsThis(),
+      write: sandbox.stub().resolves()
+    }
+    sandbox.stub(core, 'summary').value(summaryStub)
 
     // Stub file system
     readFileStub = sandbox.stub()
@@ -363,6 +374,174 @@ describe('linter', () => {
         assert.include(error.message, 'Invalid config')
         assert.isTrue(scope.isDone(), 'API request should be made')
       }
+    })
+
+    it('should create summary with grouped errors', async () => {
+      const files = ['app.js', 'index.html']
+      const apiKey = 'test-key'
+      const axeLinterUrl = 'https://test-linter.com'
+      const linterConfig = {}
+
+      // Setup file reads
+      readFileStub.withArgs('app.js', 'utf8').returns('const x = 1;')
+      readFileStub.withArgs('index.html', 'utf8').returns('<div>test</div>')
+
+      // Mock API responses
+      nock(axeLinterUrl)
+        .post('/lint-source', {
+          source: 'const x = 1;',
+          filename: 'app.js',
+          config: linterConfig
+        })
+        .reply(200, {
+          report: {
+            errors: [
+              {
+                ruleId: 'click-handler',
+                lineNumber: 1,
+                column: 1,
+                endColumn: 10,
+                description: 'Click handler should have keyboard equivalent'
+              }
+            ]
+          }
+        })
+
+      nock(axeLinterUrl)
+        .post('/lint-source', {
+          source: '<div>test</div>',
+          filename: 'index.html',
+          config: linterConfig
+        })
+        .reply(200, {
+          report: {
+            errors: [
+              {
+                ruleId: 'color-contrast',
+                lineNumber: 1,
+                column: 1,
+                endColumn: 15,
+                description: 'Element has insufficient color contrast'
+              },
+              {
+                ruleId: 'aria-label',
+                lineNumber: 1,
+                column: 1,
+                endColumn: 15,
+                description: 'Element should have aria-label'
+              }
+            ]
+          }
+        })
+
+      const errorCount = await lintFiles(
+        files,
+        apiKey,
+        axeLinterUrl,
+        linterConfig
+      )
+
+      // Verify error count
+      assert.equal(errorCount, 3, 'Should return correct total error count')
+
+      // Verify summary creation
+      assert.isTrue(
+        summaryStub.addHeading.calledWith('Accessibility Linting Results'),
+        'Should add main heading'
+      )
+
+      // Verify file sections
+      assert.isTrue(
+        summaryStub.addHeading.calledWith('❌ Error in app.js:', 2),
+        'Should add app.js section'
+      )
+
+      assert.isTrue(
+        summaryStub.addHeading.calledWith('❌ Errors in index.html:', 2),
+        'Should add index.html section'
+      )
+
+      // Verify error lists
+      const appJsErrors = [
+        '🔴 Line 1: click-handler - Click handler should have keyboard equivalent'
+      ]
+      const indexHtmlErrors = [
+        '🔴 Line 1: color-contrast - Element has insufficient color contrast',
+        '🔴 Line 1: aria-label - Element should have aria-label'
+      ]
+
+      assert.isTrue(
+        summaryStub.addList.calledWith(appJsErrors),
+        'Should add app.js errors to list'
+      )
+      assert.isTrue(
+        summaryStub.addList.calledWith(indexHtmlErrors),
+        'Should add index.html errors to list'
+      )
+
+      // Verify footer
+      assert.isTrue(
+        summaryStub.addRaw.calledWith('Found 3 accessibility issues'),
+        'Should add correct error count to summary'
+      )
+
+      // Verify GitHub annotations
+      assert.equal(
+        errorStub.callCount,
+        3,
+        'Should create three error annotations'
+      )
+      assert.isTrue(
+        errorStub.calledWith(
+          'app.js:1 - click-handler - Click handler should have keyboard equivalent',
+          {
+            file: 'app.js',
+            startLine: 1,
+            startColumn: 1,
+            endColumn: 10,
+            title: 'Axe Linter'
+          }
+        ),
+        'Should create correct annotation for app.js'
+      )
+    })
+
+    it('should handle no errors in summary', async () => {
+      const files = ['clean.js']
+      const apiKey = 'test-key'
+      const axeLinterUrl = 'https://test-linter.com'
+      const linterConfig = {}
+
+      readFileStub.withArgs('clean.js', 'utf8').returns('const x = 1;')
+
+      nock(axeLinterUrl)
+        .post('/lint-source')
+        .reply(200, {
+          report: {
+            errors: []
+          }
+        })
+
+      const errorCount = await lintFiles(
+        files,
+        apiKey,
+        axeLinterUrl,
+        linterConfig
+      )
+
+      assert.equal(errorCount, 0, 'Should return zero errors')
+      assert.isTrue(
+        summaryStub.addHeading.calledWith('Accessibility Linting Results'),
+        'Should still create summary heading'
+      )
+      assert.isTrue(
+        summaryStub.addRaw.calledWith('Found 0 accessibility issues'),
+        'Should show zero issues in summary'
+      )
+      assert.isFalse(
+        errorStub.called,
+        'Should not create any error annotations'
+      )
     })
   })
 })
