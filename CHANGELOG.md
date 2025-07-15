@@ -2,15 +2,9 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
-## [1.2.0](https://github.com/dequelabs/axe-linter-action/compare/v1.0.0...v1.2.0) (2025-07-15)
+## [1.2.0](https://github.com/dequelabs/axe-linter-action/compare/v1.1.0...v1.2.0) (2025-07-15)
 
-### Features
-
-- add filename and line number to error ([#60](https://github.com/dequelabs/axe-linter-action/issues/60)) ([943d86d](https://github.com/dequelabs/axe-linter-action/commit/943d86da9710318d858b418c86cd14c17bf9c0e5))
-
-### Bug Fixes
-
-- Skipping Empty Files ([#51](https://github.com/dequelabs/axe-linter-action/issues/51)) ([bd47f92](https://github.com/dequelabs/axe-linter-action/commit/bd47f92b8ae7cfbc3ce9a8e8df0836db1876b974))
+**Note:** This release contains dependency updates.
 
 ## [1.1.0](https://github.com/dequelabs/axe-linter-action/compare/v1.0.0...v1.1.0) (2025-03-20)
 
