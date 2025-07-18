@@ -1,0 +1,53 @@
+name: Create Release PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-type:
+        default: ''
+        type: choice
+        description: SemVer release type
+        options:
+          - ''
+          - major
+          - minor
+          - patch
+
+jobs:
+  create-release-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'yarn'
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - run: |
+          Branch="release/$(date +%Y%m%d%H%M%S)"
+          git config user.name ${{ secrets.GIT_USER }}
+          git config user.email ${{ secrets.GIT_EMAIL }}
+          git checkout -b $Branch
+
+          if [[ "${{ github.event.inputs.release-type }}" != "" ]]; then
+            echo "Release type provided: ${{ github.event.inputs.release-type }}"
+            yarn release -- --release-as "${{ github.event.inputs.release-type }}"
+          else
+            echo "No release type provided, using default."
+            yarn release
+          fi
+
+          git push -u origin "$Branch"
+
+          VERSION=$(node -p "require('./package.json').version")
+          gh pr create \
+            --head "$Branch" \
+            --title "chore(release): v${VERSION}" \
+            --body "Automated release PR for version v${VERSION}." \
+            --base main
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
