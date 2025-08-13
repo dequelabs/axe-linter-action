@@ -43015,6 +43015,7 @@ ${pendingInterceptorsFormatter.format(pending)}
       function lintFiles(files, apiKey, axeLinterUrl, linterConfig) {
         return __awaiter(this, void 0, void 0, function* () {
           let totalErrors = 0
+          const fileErrors = {}
           for (const file of files) {
             const fileContents = (0, fs_1.readFileSync)(file, 'utf8')
             // Skip empty files
@@ -43054,20 +43055,56 @@ ${pendingInterceptorsFormatter.format(pending)}
             }
             const errors = result.report.errors
             totalErrors += errors.length
-            // Report errors using GitHub annotations
-            for (const error of errors) {
-              core.error(
-                `${file}:${error.lineNumber} - ${error.ruleId} - ${error.description}`,
-                {
-                  file,
-                  startLine: error.lineNumber,
-                  startColumn: error.column,
-                  endColumn: error.endColumn,
-                  title: 'Axe Linter'
-                }
-              )
+            if (errors.length > 0) {
+              fileErrors[file] = errors.map((error) => ({
+                line: error.lineNumber,
+                column: error.column,
+                endColumn: error.endColumn,
+                message: `${error.ruleId} - ${error.description}`,
+                ruleId: error.ruleId,
+                description: error.description
+              }))
             }
           }
+          // Create summary of all errors
+          core.summary.addHeading('Accessibility Linting Results').addBreak()
+          for (const [file, errors] of Object.entries(fileErrors)) {
+            if (errors.length > 0) {
+              // Add file heading
+              core.summary
+                .addHeading(
+                  `❌ Error${(0, utils_1.pluralize)(errors.length)} in ${file}:`,
+                  2
+                )
+                .addList(
+                  errors.map(
+                    (error) =>
+                      `🔴 Line ${error.line}: ${error.ruleId} - ${error.description}`
+                  )
+                )
+                .addBreak()
+              // Create GitHub annotations
+              for (const error of errors) {
+                core.error(
+                  `${file}:${error.line} - ${error.ruleId} - ${error.description}`,
+                  {
+                    file,
+                    startLine: error.line,
+                    startColumn: error.column,
+                    endColumn: error.endColumn,
+                    title: 'Axe Linter'
+                  }
+                )
+              }
+            }
+          }
+          // Add summary footer
+          yield core.summary
+            .addBreak()
+            .addRaw(
+              `Found ${totalErrors} accessibility issue${(0, utils_1.pluralize)(totalErrors)}`
+            )
+            .write()
           core.debug(
             `Found ${totalErrors} error${(0, utils_1.pluralize)(totalErrors)}`
           )

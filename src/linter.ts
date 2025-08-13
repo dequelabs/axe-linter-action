@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import { readFileSync } from 'fs'
-import type { LinterResponse } from './types'
+import type { LinterResponse, ErrorDetail } from './types'
 import fetch from 'node-fetch'
 import { pluralize } from './utils'
 
@@ -11,6 +11,7 @@ export async function lintFiles(
   linterConfig: Record<string, unknown>
 ): Promise<number> {
   let totalErrors = 0
+  const fileErrors: Record<string, ErrorDetail[]> = {}
 
   for (const file of files) {
     const fileContents = readFileSync(file, 'utf8')
@@ -52,21 +53,55 @@ export async function lintFiles(
 
     const errors = result.report.errors
     totalErrors += errors.length
-
-    // Report errors using GitHub annotations
-    for (const error of errors) {
-      core.error(
-        `${file}:${error.lineNumber} - ${error.ruleId} - ${error.description}`,
-        {
-          file,
-          startLine: error.lineNumber,
-          startColumn: error.column,
-          endColumn: error.endColumn,
-          title: 'Axe Linter'
-        }
-      )
+    if (errors.length > 0) {
+      fileErrors[file] = errors.map((error) => ({
+        line: error.lineNumber,
+        column: error.column,
+        endColumn: error.endColumn,
+        message: `${error.ruleId} - ${error.description}`,
+        ruleId: error.ruleId,
+        description: error.description
+      }))
     }
   }
+
+  // Create summary of all errors
+  core.summary.addHeading('Accessibility Linting Results').addBreak()
+
+  for (const [file, errors] of Object.entries(fileErrors)) {
+    if (errors.length > 0) {
+      // Add file heading
+      core.summary
+        .addHeading(`❌ Error${pluralize(errors.length)} in ${file}:`, 2)
+        .addList(
+          errors.map(
+            (error) =>
+              `🔴 Line ${error.line}: ${error.ruleId} - ${error.description}`
+          )
+        )
+        .addBreak()
+
+      // Create GitHub annotations
+      for (const error of errors) {
+        core.error(
+          `${file}:${error.line} - ${error.ruleId} - ${error.description}`,
+          {
+            file,
+            startLine: error.line,
+            startColumn: error.column,
+            endColumn: error.endColumn,
+            title: 'Axe Linter'
+          }
+        )
+      }
+    }
+  }
+
+  // Add summary footer
+  await core.summary
+    .addBreak()
+    .addRaw(`Found ${totalErrors} accessibility issue${pluralize(totalErrors)}`)
+    .write()
 
   core.debug(`Found ${totalErrors} error${pluralize(totalErrors)}`)
   return totalErrors
