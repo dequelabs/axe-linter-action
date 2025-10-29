@@ -11,6 +11,7 @@ export interface LinterError {
   column: number
   endColumn: number
   description: string
+  helpURL: string
 }
 
 export interface LinterReport {
