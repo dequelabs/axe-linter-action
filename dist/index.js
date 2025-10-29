@@ -43057,7 +43057,7 @@ ${pendingInterceptorsFormatter.format(pending)}
             // Report errors using GitHub annotations
             for (const error of errors) {
               core.error(
-                `${file}:${error.lineNumber} - [${error.ruleId}](${error.helpURL}) ${error.description}`,
+                `${file}:${error.lineNumber} - ${error.ruleId} - ${error.description} \n ${error.helpURL}`,
                 {
                   file,
                   startLine: error.lineNumber,
