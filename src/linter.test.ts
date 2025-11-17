@@ -66,7 +66,8 @@ describe('linter', () => {
                 lineNumber: 1,
                 column: 1,
                 endColumn: 10,
-                description: 'Test error 1'
+                description: 'Test error 1',
+                helpURL: 'https://test-help-url-1.com'
               }
             ]
           }
@@ -79,7 +80,8 @@ describe('linter', () => {
                 lineNumber: 1,
                 column: 1,
                 endColumn: 15,
-                description: 'Test error 2'
+                description: 'Test error 2',
+                helpURL: 'https://test-help-url-2.com'
               }
             ]
           }
@@ -113,24 +115,30 @@ describe('linter', () => {
 
       // Verify error reporting
       assert.isTrue(
-        errorStub.calledWith('test.js:1 - test-rule-1 - Test error 1', {
-          file: 'test.js',
-          startLine: 1,
-          startColumn: 1,
-          endColumn: 10,
-          title: 'Axe Linter'
-        }),
+        errorStub.calledWith(
+          'test.js:1 - test-rule-1 - Test error 1\nhttps://test-help-url-1.com',
+          {
+            file: 'test.js',
+            startLine: 1,
+            startColumn: 1,
+            endColumn: 10,
+            title: 'Axe Linter'
+          }
+        ),
         'should report first error correctly'
       )
 
       assert.isTrue(
-        errorStub.calledWith('test.html:1 - test-rule-2 - Test error 2', {
-          file: 'test.html',
-          startLine: 1,
-          startColumn: 1,
-          endColumn: 15,
-          title: 'Axe Linter'
-        }),
+        errorStub.calledWith(
+          'test.html:1 - test-rule-2 - Test error 2\nhttps://test-help-url-2.com',
+          {
+            file: 'test.html',
+            startLine: 1,
+            startColumn: 1,
+            endColumn: 15,
+            title: 'Axe Linter'
+          }
+        ),
         'should report second error correctly'
       )
     })

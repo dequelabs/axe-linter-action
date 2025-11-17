@@ -1,6 +1,16 @@
 # Changelog
 
-All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
+All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
+
+## [1.3.0](https://github.com/dequelabs/axe-linter-action/compare/v1.2.0...v1.3.0) (2025-11-17)
+
+### Features
+
+- add links to GH annotations ([#82](https://github.com/dequelabs/axe-linter-action/issues/82)) ([e033b36](https://github.com/dequelabs/axe-linter-action/commit/e033b363144cdce2e28d4a4a9dd7f375c0ae4dd3))
+
+## [1.2.0](https://github.com/dequelabs/axe-linter-action/compare/v1.1.0...v1.2.0) (2025-07-15)
+
+**Note:** This release contains dependency updates.
 
 ## [1.1.0](https://github.com/dequelabs/axe-linter-action/compare/v1.0.0...v1.1.0) (2025-03-20)
 
