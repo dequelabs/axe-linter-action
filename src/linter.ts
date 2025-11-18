@@ -55,7 +55,7 @@ export async function lintFiles(
 
     // Report errors using GitHub annotations
     for (const error of errors) {
-      core.error(
+      core.warning(
         `${file}:${error.lineNumber} - ${error.ruleId} - ${error.description}\n${error.helpURL}`,
         {
           file,
