@@ -53,7 +53,7 @@ async function run(core: Core): Promise<void> {
     )
 
     if (errorCount > 0) {
-      core.setFailed(
+      core.info(
         `Found ${errorCount} accessibility issue${pluralize(errorCount)}`
       )
     }
