@@ -15,7 +15,7 @@ inputs:
     required: false
     default: https://axe-linter.deque.com
   allow_warnings:
-    description: Allow warnings to pass the action
+    description: Report accessibility errors as warnings instead of failing the action
     required: false
     default: 'false'
 runs:
