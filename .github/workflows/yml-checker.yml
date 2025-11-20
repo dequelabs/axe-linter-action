@@ -16,6 +16,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version-file: .node-version
       # This validator doesn't accept globs.
       - run: npx yaml-validator action.yml .github/action-example.yml
