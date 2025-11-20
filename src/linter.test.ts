@@ -14,6 +14,7 @@ describe('linter', () => {
   let debugStub: sinon.SinonStub
   let readFileStub: sinon.SinonStub
   let fetchStub: sinon.SinonStub
+  let warnStub: sinon.SinonStub
 
   beforeEach(() => {
     sandbox = sinon.createSandbox()
@@ -21,6 +22,7 @@ describe('linter', () => {
     // Stub core functions
     errorStub = sandbox.stub(core, 'error')
     debugStub = sandbox.stub(core, 'debug')
+    warnStub = sandbox.stub(core, 'warning')
 
     // Stub file system
     readFileStub = sandbox.stub()
@@ -107,7 +109,8 @@ describe('linter', () => {
         files,
         apiKey,
         axeLinterUrl,
-        linterConfig
+        linterConfig,
+        false
       )
 
       assert.equal(errorCount, 2, 'should return correct total error count')
@@ -172,6 +175,54 @@ describe('linter', () => {
         linterConfig
       )
 
+      assert.equal(errorCount, 1, 'should return one error for single file')
+      assert.isTrue(scope.isDone(), 'API request should be made')
+    })
+
+    it('should allow warnings when configured', async () => {
+      const files = ['test.js']
+      readFileStub
+        .withArgs('test.js', 'utf8')
+        .returns('<div><h1>hello world</h1></div>')
+
+      const scope = nock(axeLinterUrl)
+        .post('/lint-source')
+        .reply(200, {
+          report: {
+            errors: [
+              {
+                ruleId: 'test-rule-1',
+                lineNumber: 1,
+                column: 1,
+                endColumn: 10,
+                description: 'Test error 1',
+                helpURL: 'https://test-help-url-1.com'
+              }
+            ]
+          }
+        })
+
+      const errorCount = await lintFiles(
+        files,
+        apiKey,
+        axeLinterUrl,
+        linterConfig,
+        true
+      )
+
+      assert.isTrue(
+        warnStub.calledWith(
+          'test.js:1 - test-rule-1 - Test error 1\nhttps://test-help-url-1.com',
+          {
+            file: 'test.js',
+            startLine: 1,
+            startColumn: 1,
+            endColumn: 10,
+            title: 'Axe Linter'
+          }
+        ),
+        'should report warning correctly'
+      )
       assert.equal(errorCount, 1, 'should return one error for single file')
       assert.isTrue(scope.isDone(), 'API request should be made')
     })
