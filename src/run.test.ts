@@ -50,6 +50,9 @@ describe('run', () => {
     ;(mockCore.getInput as sinon.SinonStub)
       .withArgs('axe_linter_url')
       .returns('https://test-linter.com/')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('allow_warnings')
+      .returns('false')
 
     // Setup changed files
     getChangedFilesStub.resolves(['test.js', 'test.html'])
@@ -103,6 +106,9 @@ describe('run', () => {
     ;(mockCore.getInput as sinon.SinonStub)
       .withArgs('axe_linter_url')
       .returns('https://test-linter.com')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('allow_warnings')
+      .returns('false')
 
     // Return empty file list
     getChangedFilesStub.resolves([])
@@ -137,6 +143,9 @@ describe('run', () => {
     ;(mockCore.getInput as sinon.SinonStub)
       .withArgs('axe_linter_url')
       .returns('') // This will use the default URL
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('allow_warnings')
+      .returns('') // Defaults to false
 
     getChangedFilesStub.resolves(['test.js'])
 
@@ -184,6 +193,9 @@ describe('run', () => {
     ;(mockCore.getInput as sinon.SinonStub)
       .withArgs('axe_linter_url')
       .returns('https://test-linter.com')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('allow_warnings')
+      .returns('false')
 
     getChangedFilesStub.resolves(['test.js'])
 
@@ -213,6 +225,9 @@ describe('run', () => {
     ;(mockCore.getInput as sinon.SinonStub)
       .withArgs('axe_linter_url')
       .returns('https://test-linter.com')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('allow_warnings')
+      .returns('false')
 
     getChangedFilesStub.resolves(['test.js'])
 
@@ -228,6 +243,42 @@ describe('run', () => {
       (mockCore.setFailed as sinon.SinonStub).calledWith(
         'Found 1 accessibility issue'
       )
+    )
+  })
+
+  it('should handle when warnings are allowed', async () => {
+    // Setup inputs
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('github_token', { required: true })
+      .returns('test-token')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('api_key', { required: true })
+      .returns('test-api-key')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('axe_linter_url')
+      .returns('https://test-linter.com')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('allow_warnings')
+      .returns('true')
+
+    getChangedFilesStub.resolves(['test.js'])
+
+    readFileStub
+      .withArgs('axe-linter.yml', 'utf8')
+      .returns('rules:\n  test-rule: error')
+
+    lintFilesStub.resolves(3)
+
+    await run(mockCore)
+
+    assert.isTrue(
+      (mockCore.info as sinon.SinonStub).calledWith(
+        'Found 3 accessibility issues'
+      )
+    )
+    assert.isFalse(
+      (mockCore.setFailed as sinon.SinonStub).called,
+      'Should not set failed status when warnings are allowed'
     )
   })
 
@@ -257,6 +308,9 @@ describe('run', () => {
     ;(mockCore.getInput as sinon.SinonStub)
       .withArgs('axe_linter_url')
       .returns('https://test-linter.com')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('allow_warnings')
+      .returns('false')
 
     // Simulate git error
     const error = new Error('Git error')
@@ -280,6 +334,9 @@ describe('run', () => {
     ;(mockCore.getInput as sinon.SinonStub)
       .withArgs('axe_linter_url')
       .returns('')
+    ;(mockCore.getInput as sinon.SinonStub)
+      .withArgs('allow_warnings')
+      .returns('false')
 
     // Simulate a non-Error object being thrown
     getChangedFilesStub.rejects({ foo: 'bar' })

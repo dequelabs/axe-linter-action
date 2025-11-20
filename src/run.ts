@@ -10,7 +10,8 @@ async function run(core: Core): Promise<void> {
     const inputs: ActionInputs = {
       githubToken: core.getInput('github_token', { required: true }),
       apiKey: core.getInput('api_key', { required: true }),
-      axeLinterUrl: core.getInput('axe_linter_url')
+      axeLinterUrl: core.getInput('axe_linter_url'),
+      allowWarnings: core.getInput('allow_warnings').toLowerCase() === 'true'
     }
 
     // Remove trailing slash if present
@@ -49,13 +50,20 @@ async function run(core: Core): Promise<void> {
       changedFiles,
       inputs.apiKey,
       inputs.axeLinterUrl,
-      linterConfig
+      linterConfig,
+      inputs.allowWarnings
     )
 
     if (errorCount > 0) {
-      core.setFailed(
-        `Found ${errorCount} accessibility issue${pluralize(errorCount)}`
-      )
+      if (!inputs.allowWarnings) {
+        core.setFailed(
+          `Found ${errorCount} accessibility issue${pluralize(errorCount)}`
+        )
+      } else {
+        core.info(
+          `Found ${errorCount} accessibility issue${pluralize(errorCount)}`
+        )
+      }
     }
   } catch (error) {
     if (error instanceof Error) {
