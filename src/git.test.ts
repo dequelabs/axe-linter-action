@@ -26,7 +26,10 @@ describe('git', () => {
         pulls: {
           listFiles: sandbox.stub()
         }
-      }
+      },
+      paginate: sandbox
+        .stub()
+        .callsFake(async (fn, options, callback) => callback(await fn(options)))
     }
 
     // Mock GitHub context
@@ -73,7 +76,8 @@ describe('git', () => {
         mockOctokit.rest.pulls.listFiles.calledWith({
           owner: 'test-owner',
           repo: 'test-repo',
-          pull_number: 123
+          pull_number: 123,
+          per_page: 100
         }),
         'listFiles should be called with correct parameters'
       )

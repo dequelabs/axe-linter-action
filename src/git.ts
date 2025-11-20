@@ -1,5 +1,5 @@
-import * as github from '@actions/github'
 import * as core from '@actions/core'
+import * as github from '@actions/github'
 import { minimatch } from 'minimatch'
 
 const FILE_PATTERNS = [
@@ -13,6 +13,20 @@ const FILE_PATTERNS = [
   '**/*.md',
   '**/*.markdown'
 ] as const
+
+const PAGE_SIZE = 100
+
+function filterFiles(files: { filename: string; status: string }[]): string[] {
+  return files
+    .filter(
+      (file) =>
+        file.status !== 'removed' &&
+        FILE_PATTERNS.some((pattern) =>
+          minimatch(file.filename, pattern, { nocase: true })
+        )
+    )
+    .map((file) => file.filename)
+}
 
 export async function getChangedFiles(token: string): Promise<string[]> {
   const octokit = github.getOctokit(token)
@@ -30,32 +44,17 @@ export async function getChangedFiles(token: string): Promise<string[]> {
       head
     })
 
-    return (
-      response.data.files
-        ?.filter(
-          (file) =>
-            file.status !== 'removed' &&
-            FILE_PATTERNS.some((pattern) =>
-              minimatch(file.filename, pattern, { nocase: true })
-            )
-        )
-        .map((file) => file.filename) || []
-    )
+    return filterFiles(response.data.files ?? [])
   }
 
-  const response = await octokit.rest.pulls.listFiles({
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    pull_number: context.payload.pull_request.number
-  })
-
-  return response.data
-    .filter(
-      (file) =>
-        file.status !== 'removed' &&
-        FILE_PATTERNS.some((pattern) =>
-          minimatch(file.filename, pattern, { nocase: true })
-        )
-    )
-    .map((file) => file.filename)
+  return octokit.paginate(
+    octokit.rest.pulls.listFiles,
+    {
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      pull_number: context.payload.pull_request.number,
+      per_page: PAGE_SIZE
+    },
+    (response) => filterFiles(response.data)
+  )
 }
