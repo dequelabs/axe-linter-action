@@ -28,7 +28,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+      - uses: dequelabs/axe-linter-action@v1
+        with:
+          api_key: ${{ secrets.AXE_LINTER_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+## Example Usage for private repository.
+
+Create a file in your repository called `.github/workflows/axe-linter.yml` with the following contents:
+
+```yaml
+name: Lint for accessibility issues
+
+on: [pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # Required to read the contents of the pull request
+      pull-requests: read # Required to read the pull request
+    steps:
+      - uses: actions/checkout@v6
       - uses: dequelabs/axe-linter-action@v1
         with:
           api_key: ${{ secrets.AXE_LINTER_API_KEY }}
