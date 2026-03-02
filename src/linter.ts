@@ -8,7 +8,8 @@ export async function lintFiles(
   files: string[],
   apiKey: string,
   axeLinterUrl: string,
-  linterConfig: Record<string, unknown>
+  linterConfig: Record<string, unknown>,
+  allowWarnings: boolean = false
 ): Promise<number> {
   let totalErrors = 0
 
@@ -55,16 +56,20 @@ export async function lintFiles(
 
     // Report errors using GitHub annotations
     for (const error of errors) {
-      core.error(
-        `${file}:${error.lineNumber} - ${error.ruleId} - ${error.description}\n${error.helpURL}`,
-        {
-          file,
-          startLine: error.lineNumber,
-          startColumn: error.column,
-          endColumn: error.endColumn,
-          title: 'Axe Linter'
-        }
-      )
+      const linterError = `${file}:${error.lineNumber} - ${error.ruleId} - ${error.description}\n${error.helpURL}`
+      const annotationError = {
+        file,
+        startLine: error.lineNumber,
+        startColumn: error.column,
+        endColumn: error.endColumn,
+        title: 'Axe Linter'
+      }
+
+      if (!allowWarnings) {
+        core.error(linterError, annotationError)
+      } else {
+        core.warning(linterError, annotationError)
+      }
     }
   }
 
