@@ -1,7 +1,6 @@
 import * as core from '@actions/core'
 import { readFileSync } from 'fs'
 import type { LinterResponse } from './types'
-import fetch from 'node-fetch'
 import { pluralize } from './utils'
 
 export async function lintFiles(

@@ -298,7 +298,7 @@ describe('linter', () => {
       readFileStub
         .withArgs('test.js', 'utf8')
         .returns('<div><h1>hello world</h1></div>')
-      sandbox.replace(require('node-fetch'), 'default', fetchStub)
+      sandbox.replace(globalThis, 'fetch', fetchStub as typeof fetch)
 
       // Make fetch throw a non-Error object
       const nonErrorObject = {
