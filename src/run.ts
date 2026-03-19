@@ -1,4 +1,4 @@
-import { readFileSync, globSync } from 'fs'
+import { readFileSync, globSync, statSync } from 'fs'
 import { load } from 'js-yaml'
 import { lintFiles } from './linter'
 import { getChangedFiles } from './git'
@@ -25,6 +25,7 @@ export function getOnlyFiles(): string[] {
     .map((pattern) => pattern.trim())
     .filter(Boolean)
     .flatMap((pattern) => globSync(pattern))
+    .filter((file) => statSync(file).isFile())
 }
 
 async function run(core: Core): Promise<void> {

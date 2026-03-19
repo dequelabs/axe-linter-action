@@ -32,6 +32,11 @@ describe('run', () => {
     globSyncStub = sandbox.stub()
     sandbox.replace(require('fs'), 'readFileSync', readFileStub)
     sandbox.replace(require('fs'), 'globSync', globSyncStub)
+    sandbox.replace(
+      require('fs'),
+      'statSync',
+      sandbox.stub().returns({ isFile: () => true })
+    )
 
     // Stub git and linter functions
     getChangedFilesStub = sandbox.stub(gitModule, 'getChangedFiles')
@@ -425,6 +430,11 @@ describe('getOnlyFiles', () => {
     sandbox = sinon.createSandbox()
     globSyncStub = sandbox.stub()
     sandbox.replace(require('fs'), 'globSync', globSyncStub)
+    sandbox.replace(
+      require('fs'),
+      'statSync',
+      sandbox.stub().returns({ isFile: () => true })
+    )
     delete process.env.AXE_LINTER_ONLY
   })
 

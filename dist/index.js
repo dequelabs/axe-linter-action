@@ -38718,6 +38718,7 @@ ${pendingInterceptorsFormatter.format(pending)}
           .map((pattern) => pattern.trim())
           .filter(Boolean)
           .flatMap((pattern) => (0, fs_1.globSync)(pattern))
+          .filter((file) => (0, fs_1.statSync)(file).isFile())
       }
       function run(core) {
         return __awaiter(this, void 0, void 0, function* () {
