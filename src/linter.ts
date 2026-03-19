@@ -20,9 +20,7 @@ export async function lintFiles(
       continue
     }
 
-    const url = new URL('lint-source', axeLinterUrl).toString()
-
-    const response = await fetch(url, {
+    const response = await fetch(`${axeLinterUrl}/lint-source`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

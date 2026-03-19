@@ -9551,8 +9551,8 @@
         var cIsNsCharOrWhitespace = isNsCharOrWhitespace(c)
         var cIsNsChar = cIsNsCharOrWhitespace && !isWhitespace(c)
         return (
-          (// ns-plain-safe
-          (inblock // c = flow-in
+          // ns-plain-safe
+          ((inblock // c = flow-in
             ? cIsNsCharOrWhitespace
             : cIsNsCharOrWhitespace &&
               // - c-flow-indicator
@@ -13270,9 +13270,9 @@
 
       function isHexCode(c) {
         return (
-          (0x30 /* 0 */ <= c && c <= 0x39 /* 9 */) ||
-          (0x41 /* A */ <= c && c <= 0x46 /* F */) ||
-          (0x61 /* a */ <= c && c <= 0x66 /* f */)
+          (0x30 /* 0 */ <= c && c <= 0x39) /* 9 */ ||
+          (0x41 /* A */ <= c && c <= 0x46) /* F */ ||
+          (0x61 /* a */ <= c && c <= 0x66) /* f */
         )
       }
 
@@ -38595,8 +38595,7 @@ ${pendingInterceptorsFormatter.format(pending)}
               core.debug(`Skipping empty file ${file}`)
               continue
             }
-            const url = new URL('/lint-source', axeLinterUrl).toString()
-            const response = yield fetch(url, {
+            const response = yield fetch(`${axeLinterUrl}/lint-source`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
