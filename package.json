@@ -2,7 +2,7 @@
   "name": "@deque/axe-linter-action",
   "version": "1.3.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MPL-2.0",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "ncc build src/index.ts --license licenses.txt",
