@@ -38712,7 +38712,8 @@ ${pendingInterceptorsFormatter.format(pending)}
           return []
         }
         return includePatterns
-          .split('\n')
+          .split(/\r?\n/)
+          .map((pattern) => pattern.trim())
           .filter(Boolean)
           .flatMap((pattern) => (0, fs_1.globSync)(pattern))
       }

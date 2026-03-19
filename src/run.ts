@@ -21,7 +21,8 @@ export function getIncludedFiles(): string[] {
   }
 
   return includePatterns
-    .split('\n')
+    .split(/\r?\n/)
+    .map((pattern) => pattern.trim())
     .filter(Boolean)
     .flatMap((pattern) => globSync(pattern))
 }
