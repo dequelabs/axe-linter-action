@@ -38539,9 +38539,12 @@ ${pendingInterceptorsFormatter.format(pending)}
               fileUnderLint: file,
               endpoint: response.url
             }
-            const error = new Error('HTTP Error')
-            error.cause = data
-            throw error
+            core.startGroup('Linter API Details')
+            core.info(JSON.stringify(data, null, 2))
+            core.endGroup()
+            throw new Error(
+              `HTTP error ${response.status}: ${response.statusText}`
+            )
           }
           const contentType = response.headers.get('content-type')
           if (!contentType?.includes('application/json')) {
