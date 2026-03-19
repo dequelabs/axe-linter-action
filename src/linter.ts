@@ -34,6 +34,8 @@ export async function lintFiles(
     })
 
     if (!response.ok) {
+      core.info(`All files to lint: ${files.join(', ')}`)
+      core.error(`Error linting file ${file}: ${response.statusText}`)
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
