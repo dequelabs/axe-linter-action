@@ -13,8 +13,6 @@ describe('linter', () => {
   let errorStub: sinon.SinonStub
   let debugStub: sinon.SinonStub
   let readFileStub: sinon.SinonStub
-  let fetchStub: sinon.SinonStub
-
   beforeEach(() => {
     sandbox = sinon.createSandbox()
 
@@ -25,9 +23,6 @@ describe('linter', () => {
     // Stub file system
     readFileStub = sandbox.stub()
     sandbox.replace(require('fs'), 'readFileSync', readFileStub)
-
-    // Stub fetch
-    fetchStub = sandbox.stub()
 
     // Enable Nock
     nock.disableNetConnect()
@@ -298,7 +293,6 @@ describe('linter', () => {
       readFileStub
         .withArgs('test.js', 'utf8')
         .returns('<div><h1>hello world</h1></div>')
-      sandbox.replace(require('node-fetch'), 'default', fetchStub)
 
       // Make fetch throw a non-Error object
       const nonErrorObject = {
@@ -307,6 +301,7 @@ describe('linter', () => {
         statusCode: 500
       }
 
+      const fetchStub = sandbox.stub(globalThis, 'fetch')
       fetchStub.rejects(nonErrorObject)
 
       try {
