@@ -5,7 +5,7 @@ import { getChangedFiles } from './git'
 import type { Core, ActionInputs } from './types'
 import { pluralize } from './utils'
 
-export function getIncludedFiles(): string[] {
+export function getOnlyFiles(): string[] {
   /**
    * @WARNING
    *
@@ -15,12 +15,12 @@ export function getIncludedFiles(): string[] {
    * on this in your own code. Use the supported `inputs`
    * mechanism only to provide configuration to the action.
    */
-  const includePatterns = process.env.AXE_LINTER_INCLUDE
-  if (!includePatterns) {
+  const patterns = process.env.AXE_LINTER_ONLY
+  if (!patterns) {
     return []
   }
 
-  return includePatterns
+  return patterns
     .split(/\r?\n/)
     .map((pattern) => pattern.trim())
     .filter(Boolean)
@@ -38,9 +38,11 @@ async function run(core: Core): Promise<void> {
     // Remove trailing slash if present
     inputs.axeLinterUrl = inputs.axeLinterUrl.replace(/\/$/, '')
 
-    const changedFiles = await getChangedFiles(inputs.githubToken)
-    const includedFiles = getIncludedFiles()
-    const filesToLint = [...new Set([...changedFiles, ...includedFiles])]
+    const onlyFiles = getOnlyFiles()
+    const filesToLint =
+      onlyFiles.length > 0
+        ? onlyFiles
+        : await getChangedFiles(inputs.githubToken)
 
     if (filesToLint.length === 0) {
       core.debug('No files to lint')

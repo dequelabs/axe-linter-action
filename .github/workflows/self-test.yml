@@ -34,7 +34,7 @@ jobs:
       - name: Run axe Linter
         uses: ./
         env:
-          AXE_LINTER_INCLUDE: 'fixtures/**'
+          AXE_LINTER_ONLY: 'fixtures/**'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           api_key: ${{ secrets.AXE_LINTER_API_KEY }}

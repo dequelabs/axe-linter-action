@@ -9551,8 +9551,8 @@
         var cIsNsCharOrWhitespace = isNsCharOrWhitespace(c)
         var cIsNsChar = cIsNsCharOrWhitespace && !isWhitespace(c)
         return (
-          (// ns-plain-safe
-          (inblock // c = flow-in
+          // ns-plain-safe
+          ((inblock // c = flow-in
             ? cIsNsCharOrWhitespace
             : cIsNsCharOrWhitespace &&
               // - c-flow-indicator
@@ -13270,9 +13270,9 @@
 
       function isHexCode(c) {
         return (
-          (0x30 /* 0 */ <= c && c <= 0x39 /* 9 */) ||
-          (0x41 /* A */ <= c && c <= 0x46 /* F */) ||
-          (0x61 /* a */ <= c && c <= 0x66 /* f */)
+          (0x30 /* 0 */ <= c && c <= 0x39) /* 9 */ ||
+          (0x41 /* A */ <= c && c <= 0x46) /* F */ ||
+          (0x61 /* a */ <= c && c <= 0x66) /* f */
         )
       }
 
@@ -38693,13 +38693,13 @@ ${pendingInterceptorsFormatter.format(pending)}
           })
         }
       Object.defineProperty(exports, '__esModule', { value: true })
-      exports.getIncludedFiles = getIncludedFiles
+      exports.getOnlyFiles = getOnlyFiles
       const fs_1 = __nccwpck_require__(9896)
       const js_yaml_1 = __nccwpck_require__(4281)
       const linter_1 = __nccwpck_require__(5761)
       const git_1 = __nccwpck_require__(1243)
       const utils_1 = __nccwpck_require__(1798)
-      function getIncludedFiles() {
+      function getOnlyFiles() {
         /**
          * @WARNING
          *
@@ -38709,11 +38709,11 @@ ${pendingInterceptorsFormatter.format(pending)}
          * on this in your own code. Use the supported `inputs`
          * mechanism only to provide configuration to the action.
          */
-        const includePatterns = process.env.AXE_LINTER_INCLUDE
-        if (!includePatterns) {
+        const patterns = process.env.AXE_LINTER_ONLY
+        if (!patterns) {
           return []
         }
-        return includePatterns
+        return patterns
           .split(/\r?\n/)
           .map((pattern) => pattern.trim())
           .filter(Boolean)
@@ -38729,13 +38729,11 @@ ${pendingInterceptorsFormatter.format(pending)}
             }
             // Remove trailing slash if present
             inputs.axeLinterUrl = inputs.axeLinterUrl.replace(/\/$/, '')
-            const changedFiles = yield (0, git_1.getChangedFiles)(
-              inputs.githubToken
-            )
-            const includedFiles = getIncludedFiles()
-            const filesToLint = [
-              ...new Set([...changedFiles, ...includedFiles])
-            ]
+            const onlyFiles = getOnlyFiles()
+            const filesToLint =
+              onlyFiles.length > 0
+                ? onlyFiles
+                : yield (0, git_1.getChangedFiles)(inputs.githubToken)
             if (filesToLint.length === 0) {
               core.debug('No files to lint')
               return
