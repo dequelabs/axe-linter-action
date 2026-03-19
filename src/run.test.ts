@@ -2,7 +2,7 @@ import 'mocha'
 import { assert } from 'chai'
 import * as sinon from 'sinon'
 import * as yaml from 'js-yaml'
-import run from './run'
+import run, { getIncludedFiles } from './run'
 import * as gitModule from './git'
 import * as linterModule from './linter'
 import { Core } from './types'
@@ -11,6 +11,7 @@ describe('run', () => {
   let sandbox: sinon.SinonSandbox
   let mockCore: Core
   let readFileStub: sinon.SinonStub
+  let globSyncStub: sinon.SinonStub
   let getChangedFilesStub: sinon.SinonStub
   let lintFilesStub: sinon.SinonStub
 
@@ -28,14 +29,20 @@ describe('run', () => {
 
     // Stub file system
     readFileStub = sandbox.stub()
+    globSyncStub = sandbox.stub()
     sandbox.replace(require('fs'), 'readFileSync', readFileStub)
+    sandbox.replace(require('fs'), 'globSync', globSyncStub)
 
     // Stub git and linter functions
     getChangedFilesStub = sandbox.stub(gitModule, 'getChangedFiles')
     lintFilesStub = sandbox.stub(linterModule, 'lintFiles')
+
+    // Clear env var by default
+    delete process.env.AXE_LINTER_INCLUDE
   })
 
   afterEach(() => {
+    delete process.env.AXE_LINTER_INCLUDE
     sandbox.restore()
   })
 
@@ -291,5 +298,198 @@ describe('run', () => {
       (mockCore.setFailed as sinon.SinonStub).getCall(0).args[0],
       'An unexpected error occurred: {"foo":"bar"}'
     )
+  })
+
+  describe('AXE_LINTER_INCLUDE', () => {
+    it('should merge included files with changed files', async () => {
+      process.env.AXE_LINTER_INCLUDE = 'fixtures/**'
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('github_token', { required: true })
+        .returns('test-token')
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('api_key', { required: true })
+        .returns('test-api-key')
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('axe_linter_url')
+        .returns('https://test-linter.com')
+
+      getChangedFilesStub.resolves(['src/app.js'])
+      globSyncStub.withArgs('fixtures/**').returns(['fixtures/accessible.html'])
+      readFileStub
+        .withArgs('axe-linter.yml', 'utf8')
+        .throws(new Error('ENOENT'))
+      lintFilesStub.resolves(0)
+
+      await run(mockCore)
+
+      assert.isTrue(
+        lintFilesStub.calledWith(
+          ['src/app.js', 'fixtures/accessible.html'],
+          'test-api-key',
+          'https://test-linter.com',
+          {}
+        )
+      )
+    })
+
+    it('should lint included files even when no changed files', async () => {
+      process.env.AXE_LINTER_INCLUDE = 'fixtures/**'
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('github_token', { required: true })
+        .returns('test-token')
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('api_key', { required: true })
+        .returns('test-api-key')
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('axe_linter_url')
+        .returns('https://test-linter.com')
+
+      getChangedFilesStub.resolves([])
+      globSyncStub
+        .withArgs('fixtures/**')
+        .returns(['fixtures/accessible.html', 'fixtures/accessible.vue'])
+      readFileStub
+        .withArgs('axe-linter.yml', 'utf8')
+        .throws(new Error('ENOENT'))
+      lintFilesStub.resolves(0)
+
+      await run(mockCore)
+
+      assert.isTrue(
+        lintFilesStub.called,
+        'Linter should be called with included files'
+      )
+      assert.deepEqual(lintFilesStub.getCall(0).args[0], [
+        'fixtures/accessible.html',
+        'fixtures/accessible.vue'
+      ])
+    })
+
+    it('should deduplicate files present in both changed and included', async () => {
+      process.env.AXE_LINTER_INCLUDE = 'fixtures/**'
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('github_token', { required: true })
+        .returns('test-token')
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('api_key', { required: true })
+        .returns('test-api-key')
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('axe_linter_url')
+        .returns('https://test-linter.com')
+
+      getChangedFilesStub.resolves(['fixtures/accessible.html', 'src/app.js'])
+      globSyncStub.withArgs('fixtures/**').returns(['fixtures/accessible.html'])
+      readFileStub
+        .withArgs('axe-linter.yml', 'utf8')
+        .throws(new Error('ENOENT'))
+      lintFilesStub.resolves(0)
+
+      await run(mockCore)
+
+      assert.deepEqual(lintFilesStub.getCall(0).args[0], [
+        'fixtures/accessible.html',
+        'src/app.js'
+      ])
+    })
+
+    it('should not call globSync when env var is not set', async () => {
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('github_token', { required: true })
+        .returns('test-token')
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('api_key', { required: true })
+        .returns('test-api-key')
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('axe_linter_url')
+        .returns('https://test-linter.com')
+
+      getChangedFilesStub.resolves(['test.js'])
+      readFileStub
+        .withArgs('axe-linter.yml', 'utf8')
+        .throws(new Error('ENOENT'))
+      lintFilesStub.resolves(0)
+
+      await run(mockCore)
+
+      assert.isFalse(
+        globSyncStub.called,
+        'globSync should not be called without env var'
+      )
+    })
+
+    it('should handle multiple glob patterns separated by newlines', async () => {
+      process.env.AXE_LINTER_INCLUDE = 'fixtures/*.html\nfixtures/*.vue'
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('github_token', { required: true })
+        .returns('test-token')
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('api_key', { required: true })
+        .returns('test-api-key')
+      ;(mockCore.getInput as sinon.SinonStub)
+        .withArgs('axe_linter_url')
+        .returns('https://test-linter.com')
+
+      getChangedFilesStub.resolves([])
+      globSyncStub
+        .withArgs('fixtures/*.html')
+        .returns(['fixtures/accessible.html', 'fixtures/accessible.htm'])
+      globSyncStub
+        .withArgs('fixtures/*.vue')
+        .returns(['fixtures/accessible.vue'])
+      readFileStub
+        .withArgs('axe-linter.yml', 'utf8')
+        .throws(new Error('ENOENT'))
+      lintFilesStub.resolves(0)
+
+      await run(mockCore)
+
+      assert.deepEqual(lintFilesStub.getCall(0).args[0], [
+        'fixtures/accessible.html',
+        'fixtures/accessible.htm',
+        'fixtures/accessible.vue'
+      ])
+    })
+  })
+})
+
+describe('getIncludedFiles', () => {
+  let sandbox: sinon.SinonSandbox
+  let globSyncStub: sinon.SinonStub
+
+  beforeEach(() => {
+    sandbox = sinon.createSandbox()
+    globSyncStub = sandbox.stub()
+    sandbox.replace(require('fs'), 'globSync', globSyncStub)
+    delete process.env.AXE_LINTER_INCLUDE
+  })
+
+  afterEach(() => {
+    delete process.env.AXE_LINTER_INCLUDE
+    sandbox.restore()
+  })
+
+  it('should return empty array when env var is not set', () => {
+    const result = getIncludedFiles()
+    assert.deepEqual(result, [])
+    assert.isFalse(globSyncStub.called)
+  })
+
+  it('should resolve glob patterns from env var', () => {
+    process.env.AXE_LINTER_INCLUDE = 'fixtures/**'
+    globSyncStub
+      .withArgs('fixtures/**')
+      .returns(['fixtures/a.html', 'fixtures/b.js'])
+
+    const result = getIncludedFiles()
+    assert.deepEqual(result, ['fixtures/a.html', 'fixtures/b.js'])
+  })
+
+  it('should skip empty lines', () => {
+    process.env.AXE_LINTER_INCLUDE = 'fixtures/*.html\n\nfixtures/*.js\n'
+    globSyncStub.withArgs('fixtures/*.html').returns(['fixtures/a.html'])
+    globSyncStub.withArgs('fixtures/*.js').returns(['fixtures/b.js'])
+
+    const result = getIncludedFiles()
+    assert.deepEqual(result, ['fixtures/a.html', 'fixtures/b.js'])
   })
 })

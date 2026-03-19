@@ -11,7 +11,8 @@ const FILE_PATTERNS = [
   '**/*.htm',
   '**/*.vue',
   '**/*.md',
-  '**/*.markdown'
+  '**/*.markdown',
+  '**/*.liquid'
 ] as const
 
 export async function getChangedFiles(token: string): Promise<string[]> {

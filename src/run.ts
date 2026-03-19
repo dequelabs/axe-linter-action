@@ -1,9 +1,30 @@
-import { readFileSync } from 'fs'
+import { readFileSync, globSync } from 'fs'
 import { load } from 'js-yaml'
 import { lintFiles } from './linter'
 import { getChangedFiles } from './git'
 import type { Core, ActionInputs } from './types'
 import { pluralize } from './utils'
+
+export function getIncludedFiles(): string[] {
+  /**
+   * @WARNING
+   *
+   * If you come across this, do be aware it is internal only
+   * and *NOT* supported as a public API. Its behavior may
+   * change at any point without warning. Do not rely
+   * on this in your own code. Use the supported `inputs`
+   * mechanism only to provide configuration to the action.
+   */
+  const includePatterns = process.env.AXE_LINTER_INCLUDE
+  if (!includePatterns) {
+    return []
+  }
+
+  return includePatterns
+    .split('\n')
+    .filter(Boolean)
+    .flatMap((pattern) => globSync(pattern))
+}
 
 async function run(core: Core): Promise<void> {
   try {
@@ -17,8 +38,10 @@ async function run(core: Core): Promise<void> {
     inputs.axeLinterUrl = inputs.axeLinterUrl.replace(/\/$/, '')
 
     const changedFiles = await getChangedFiles(inputs.githubToken)
+    const includedFiles = getIncludedFiles()
+    const filesToLint = [...new Set([...changedFiles, ...includedFiles])]
 
-    if (changedFiles.length === 0) {
+    if (filesToLint.length === 0) {
       core.debug('No files to lint')
       return
     }
@@ -46,7 +69,7 @@ async function run(core: Core): Promise<void> {
 
     // Run linter
     const errorCount = await lintFiles(
-      changedFiles,
+      filesToLint,
       inputs.apiKey,
       inputs.axeLinterUrl,
       linterConfig

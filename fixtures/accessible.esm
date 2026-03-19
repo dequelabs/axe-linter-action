@@ -1,0 +1,10 @@
+function AccessibleComponent() {
+  return (
+    <main>
+      <h1>Hello</h1>
+      <p>This is an accessible ESM fixture.</p>
+    </main>
+  );
+}
+
+export default AccessibleComponent;

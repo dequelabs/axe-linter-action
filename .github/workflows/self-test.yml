@@ -1,0 +1,41 @@
+name: Self-Test
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' && github.event_name != 'merge_group' }}
+
+jobs:
+  self-test:
+    if: ${{ !github.event.pull_request.draft && (github.event_name == 'push' || !github.event.pull_request.head.repo.fork) }}
+    name: Self-Test
+    environment:
+      name: General
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Run axe Linter
+        uses: ./
+        env:
+          AXE_LINTER_INCLUDE: 'fixtures/**'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          api_key: ${{ secrets.AXE_LINTER_API_KEY }}
+          axe_linter_url: ${{ secrets.AXE_LINTER_URL }}
