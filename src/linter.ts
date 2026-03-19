@@ -20,7 +20,9 @@ export async function lintFiles(
       continue
     }
 
-    const response = await fetch(`${axeLinterUrl}/lint-source`, {
+    const url = new URL('/lint-source', axeLinterUrl).toString()
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -34,9 +36,16 @@ export async function lintFiles(
     })
 
     if (!response.ok) {
-      core.info(`All files to lint: ${files.join(', ')}`)
-      core.error(`Error linting file ${file}: ${response.statusText}`)
-      throw new Error(`HTTP error! status: ${response.status}`)
+      const data = {
+        status: response.status,
+        statusText: response.statusText,
+        fileUnderLint: file,
+        endpoint: response.url
+      }
+      const error = new Error('HTTP Error')
+      error.cause = data
+
+      throw error
     }
 
     const contentType = response.headers.get('content-type')
