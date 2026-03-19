@@ -38,4 +38,4 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           api_key: ${{ secrets.AXE_LINTER_API_KEY }}
-          axe_linter_url: ${{ secrets.AXE_LINTER_URL }}
+          axe_linter_url: ${{ vars.LINTER_URL }}

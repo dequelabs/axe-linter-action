@@ -40,7 +40,9 @@ export async function lintFiles(
         status: response.status,
         statusText: response.statusText,
         fileUnderLint: file,
-        endpoint: response.url
+        endpoint: response.url,
+        totalFiles: files.length,
+        files: files
       }
       core.startGroup('Linter API Details')
       core.info(JSON.stringify(data, null, 2))
