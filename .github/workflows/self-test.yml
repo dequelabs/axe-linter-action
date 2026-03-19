@@ -25,7 +25,7 @@ jobs:
     if: ${{ !github.event.pull_request.draft && (github.event_name == 'push' || !github.event.pull_request.head.repo.fork) }}
     name: Self-Test
     environment:
-      name: General
+      name: general
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
