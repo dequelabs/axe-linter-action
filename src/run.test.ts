@@ -1,13 +1,12 @@
-import { describe, it, beforeEach, afterEach, mock } from 'node:test'
+import { describe, it, before, beforeEach, after, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import { stringify } from 'yaml'
-import run, { getOnlyFiles } from './run'
-import * as gitModule from './git'
-import * as linterModule from './linter'
-import { Core } from './types'
-import { wasCalledWith } from './test-utils'
+import type { Core } from './types.ts'
+import { wasCalledWith } from './test-utils.ts'
 
 describe('run', () => {
+  let run: typeof import('./run.ts').default
+  let getOnlyFiles: typeof import('./run.ts').getOnlyFiles
   let mockCore: Core
   let getInputMock: any
   let setFailedMock: any
@@ -16,16 +15,60 @@ describe('run', () => {
   let setOutputMock: any
   let readFileMock: any
   let globSyncMock: any
+  let statSyncMock: any
   let getChangedFilesMock: any
   let lintFilesMock: any
 
-  beforeEach(() => {
-    // Create mock Core implementation
+  before(async () => {
     getInputMock = mock.fn(() => '')
     setFailedMock = mock.fn()
     infoMock = mock.fn()
     debugMock = mock.fn()
     setOutputMock = mock.fn()
+
+    readFileMock = mock.fn(() => '')
+    globSyncMock = mock.fn(() => [])
+    statSyncMock = mock.fn(() => ({ isFile: () => true }))
+    getChangedFilesMock = mock.fn(() => Promise.resolve([]))
+    lintFilesMock = mock.fn(() => Promise.resolve(0))
+
+    mock.module('fs', {
+      namedExports: {
+        readFileSync: readFileMock,
+        globSync: globSyncMock,
+        statSync: statSyncMock
+      }
+    })
+
+    mock.module('./git.ts', {
+      namedExports: { getChangedFiles: getChangedFilesMock }
+    })
+    mock.module('./linter.ts', {
+      namedExports: { lintFiles: lintFilesMock }
+    })
+
+    const mod = await import('./run.ts')
+    run = mod.default
+    getOnlyFiles = mod.getOnlyFiles
+  })
+
+  beforeEach(() => {
+    getInputMock.mock.resetCalls()
+    getInputMock.mock.mockImplementation(() => '')
+    setFailedMock.mock.resetCalls()
+    infoMock.mock.resetCalls()
+    debugMock.mock.resetCalls()
+    setOutputMock.mock.resetCalls()
+    readFileMock.mock.resetCalls()
+    readFileMock.mock.mockImplementation(() => '')
+    globSyncMock.mock.resetCalls()
+    globSyncMock.mock.mockImplementation(() => [])
+    statSyncMock.mock.resetCalls()
+    statSyncMock.mock.mockImplementation(() => ({ isFile: () => true }))
+    getChangedFilesMock.mock.resetCalls()
+    getChangedFilesMock.mock.mockImplementation(() => Promise.resolve([]))
+    lintFilesMock.mock.resetCalls()
+    lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
 
     mockCore = {
       getInput: getInputMock,
@@ -35,24 +78,10 @@ describe('run', () => {
       setOutput: setOutputMock
     } as unknown as Core
 
-    // Stub file system
-    readFileMock = mock.method(require('fs'), 'readFileSync', () => '')
-    globSyncMock = mock.method(require('fs'), 'globSync', () => [])
-    mock.method(require('fs'), 'statSync', () => ({ isFile: () => true }))
-
-    // Stub git and linter functions
-    getChangedFilesMock = mock.method(gitModule, 'getChangedFiles', () =>
-      Promise.resolve([])
-    )
-    lintFilesMock = mock.method(linterModule, 'lintFiles', () =>
-      Promise.resolve(0)
-    )
-
-    // Clear env var by default
     delete process.env.AXE_LINTER_ONLY
   })
 
-  afterEach(() => {
+  after(() => {
     delete process.env.AXE_LINTER_ONLY
     mock.restoreAll()
   })
@@ -89,10 +118,8 @@ describe('run', () => {
 
     await run(mockCore)
 
-    // Verify inputs were processed correctly
     assert.ok(wasCalledWith(getInputMock, 'github_token', { required: true }))
     assert.ok(wasCalledWith(getInputMock, 'api_key', { required: true }))
-    // Verify files were processed
     assert.ok(wasCalledWith(getChangedFilesMock, 'test-token'))
 
     assert.ok(
@@ -105,7 +132,6 @@ describe('run', () => {
       )
     )
 
-    // Verify no errors were reported
     assert.strictEqual(setFailedMock.mock.callCount(), 0)
   })
 
@@ -131,7 +157,6 @@ describe('run', () => {
       'Should not set failed status'
     )
 
-    // Verify readFileSync was not called
     assert.strictEqual(
       readFileMock.mock.callCount(),
       0,
@@ -155,7 +180,6 @@ describe('run', () => {
 
     await run(mockCore)
 
-    // Verify debug message for missing config
     assert.ok(
       wasCalledWith(
         debugMock,
@@ -164,19 +188,16 @@ describe('run', () => {
       'Should log correct debug message for missing config'
     )
 
-    // Verify linter was called with correct parameters
     assert.ok(
       wasCalledWith(lintFilesMock, ['test.js'], 'test-api-key', '', {}),
       'Should call linter with default config'
     )
 
-    // Verify readFileSync was called correctly
     assert.ok(
       wasCalledWith(readFileMock, 'axe-linter.yml', 'utf8'),
       'Should attempt to read config file'
     )
 
-    // Verify setFailed was not called since linter returned 0 errors
     assert.strictEqual(
       setFailedMock.mock.callCount(),
       0,
@@ -257,7 +278,6 @@ describe('run', () => {
 
     await run(mockCore)
 
-    // Verify setFailed was called with the correct message
     assert.strictEqual(
       setFailedMock.mock.calls[0].arguments[0],
       'An unexpected error occurred: {"foo":"bar"}'
@@ -363,50 +383,38 @@ describe('run', () => {
       ])
     })
   })
-})
 
-describe('getOnlyFiles', () => {
-  let globSyncMock: any
-
-  beforeEach(() => {
-    globSyncMock = mock.method(require('fs'), 'globSync', () => [])
-    mock.method(require('fs'), 'statSync', () => ({ isFile: () => true }))
-    delete process.env.AXE_LINTER_ONLY
-  })
-
-  afterEach(() => {
-    delete process.env.AXE_LINTER_ONLY
-    mock.restoreAll()
-  })
-
-  it('should return empty array when env var is not set', () => {
-    const result = getOnlyFiles()
-    assert.deepEqual(result, [])
-    assert.strictEqual(globSyncMock.mock.callCount(), 0)
-  })
-
-  it('should resolve glob patterns from env var', () => {
-    process.env.AXE_LINTER_ONLY = 'fixtures/**'
-    globSyncMock.mock.mockImplementation((pattern: string) => {
-      if (pattern === 'fixtures/**') return ['fixtures/a.html', 'fixtures/b.js']
-      return []
+  describe('getOnlyFiles', () => {
+    it('should return empty array when env var is not set', () => {
+      const result = getOnlyFiles()
+      assert.deepEqual(result, [])
+      assert.strictEqual(globSyncMock.mock.callCount(), 0)
     })
 
-    const result = getOnlyFiles()
-    assert.deepEqual(result, ['fixtures/a.html', 'fixtures/b.js'])
-  })
+    it('should resolve glob patterns from env var', () => {
+      process.env.AXE_LINTER_ONLY = 'fixtures/**'
+      globSyncMock.mock.mockImplementation((pattern: string) => {
+        if (pattern === 'fixtures/**')
+          return ['fixtures/a.html', 'fixtures/b.js']
+        return []
+      })
 
-  it('should skip empty lines', () => {
-    process.env.AXE_LINTER_ONLY = 'fixtures/*.html\n\nfixtures/*.js\n'
-    globSyncMock.mock.mockImplementation((pattern: string) => {
-      const results: Record<string, string[]> = {
-        'fixtures/*.html': ['fixtures/a.html'],
-        'fixtures/*.js': ['fixtures/b.js']
-      }
-      return results[pattern] ?? []
+      const result = getOnlyFiles()
+      assert.deepEqual(result, ['fixtures/a.html', 'fixtures/b.js'])
     })
 
-    const result = getOnlyFiles()
-    assert.deepEqual(result, ['fixtures/a.html', 'fixtures/b.js'])
+    it('should skip empty lines', () => {
+      process.env.AXE_LINTER_ONLY = 'fixtures/*.html\n\nfixtures/*.js\n'
+      globSyncMock.mock.mockImplementation((pattern: string) => {
+        const results: Record<string, string[]> = {
+          'fixtures/*.html': ['fixtures/a.html'],
+          'fixtures/*.js': ['fixtures/b.js']
+        }
+        return results[pattern] ?? []
+      })
+
+      const result = getOnlyFiles()
+      assert.deepEqual(result, ['fixtures/a.html', 'fixtures/b.js'])
+    })
   })
 })

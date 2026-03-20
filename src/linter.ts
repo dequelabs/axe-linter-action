@@ -1,7 +1,7 @@
 import * as core from '@actions/core'
 import { readFileSync, statSync } from 'fs'
-import type { LinterResponse } from './types'
-import { pluralize } from './utils'
+import type { LinterResponse } from './types.ts'
+import { pluralize } from './utils.ts'
 
 const BYTES_PER_MB = 1024 * 1024
 const MAX_FILE_SIZE_BYTES = 900 * BYTES_PER_MB
