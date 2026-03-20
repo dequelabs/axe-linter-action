@@ -73737,41 +73737,6 @@ ${pendingInterceptorsFormatter.format(pending)}
             return result
           }
         })()
-      var __awaiter =
-        (this && this.__awaiter) ||
-        function (thisArg, _arguments, P, generator) {
-          function adopt(value) {
-            return value instanceof P
-              ? value
-              : new P(function (resolve) {
-                  resolve(value)
-                })
-          }
-          return new (P || (P = Promise))(function (resolve, reject) {
-            function fulfilled(value) {
-              try {
-                step(generator.next(value))
-              } catch (e) {
-                reject(e)
-              }
-            }
-            function rejected(value) {
-              try {
-                step(generator['throw'](value))
-              } catch (e) {
-                reject(e)
-              }
-            }
-            function step(result) {
-              result.done
-                ? resolve(result.value)
-                : adopt(result.value).then(fulfilled, rejected)
-            }
-            step(
-              (generator = generator.apply(thisArg, _arguments || [])).next()
-            )
-          })
-        }
       Object.defineProperty(exports, '__esModule', { value: true })
       exports.getChangedFiles = getChangedFiles
       const github = __importStar(__nccwpck_require__(3228))
@@ -73798,45 +73763,39 @@ ${pendingInterceptorsFormatter.format(pending)}
           FILE_EXTENSIONS.has((0, path_1.extname)(filename).toLowerCase())
         )
       }
-      function getChangedFiles(token) {
-        return __awaiter(this, void 0, void 0, function* () {
-          var _a
-          const octokit = github.getOctokit(token)
-          const { context } = github
-          if (!context.payload.pull_request) {
-            core.debug('Not a pull request, checking push diff')
-            const base = context.payload.before
-            const head = context.payload.after
-            const response = yield octokit.rest.repos.compareCommits({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              base,
-              head
-            })
-            return (
-              ((_a = response.data.files) === null || _a === void 0
-                ? void 0
-                : _a
-                    .filter(
-                      (file) =>
-                        file.status !== 'removed' &&
-                        isSupportedFile(file.filename)
-                    )
-                    .map((file) => file.filename)) || []
-            )
-          }
-          const response = yield octokit.rest.pulls.listFiles({
+      async function getChangedFiles(token) {
+        const octokit = github.getOctokit(token)
+        const { context } = github
+        if (!context.payload.pull_request) {
+          core.debug('Not a pull request, checking push diff')
+          const base = context.payload.before
+          const head = context.payload.after
+          const response = await octokit.rest.repos.compareCommits({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            pull_number: context.payload.pull_request.number
+            base,
+            head
           })
-          return response.data
-            .filter(
-              (file) =>
-                file.status !== 'removed' && isSupportedFile(file.filename)
-            )
-            .map((file) => file.filename)
+          return (
+            response.data.files
+              ?.filter(
+                (file) =>
+                  file.status !== 'removed' && isSupportedFile(file.filename)
+              )
+              .map((file) => file.filename) || []
+          )
+        }
+        const response = await octokit.rest.pulls.listFiles({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          pull_number: context.payload.pull_request.number
         })
+        return response.data
+          .filter(
+            (file) =>
+              file.status !== 'removed' && isSupportedFile(file.filename)
+          )
+          .map((file) => file.filename)
       }
 
       /***/
@@ -73993,182 +73952,106 @@ ${pendingInterceptorsFormatter.format(pending)}
             return result
           }
         })()
-      var __awaiter =
-        (this && this.__awaiter) ||
-        function (thisArg, _arguments, P, generator) {
-          function adopt(value) {
-            return value instanceof P
-              ? value
-              : new P(function (resolve) {
-                  resolve(value)
-                })
-          }
-          return new (P || (P = Promise))(function (resolve, reject) {
-            function fulfilled(value) {
-              try {
-                step(generator.next(value))
-              } catch (e) {
-                reject(e)
-              }
-            }
-            function rejected(value) {
-              try {
-                step(generator['throw'](value))
-              } catch (e) {
-                reject(e)
-              }
-            }
-            function step(result) {
-              result.done
-                ? resolve(result.value)
-                : adopt(result.value).then(fulfilled, rejected)
-            }
-            step(
-              (generator = generator.apply(thisArg, _arguments || [])).next()
-            )
-          })
-        }
       Object.defineProperty(exports, '__esModule', { value: true })
       exports.lintFiles = lintFiles
       const core = __importStar(__nccwpck_require__(7484))
       const fs_1 = __nccwpck_require__(9896)
       const utils_ts_1 = __nccwpck_require__(1798)
-      function lintFiles(files, apiKey, axeLinterUrl, linterConfig) {
-        return __awaiter(this, void 0, void 0, function* () {
-          let totalErrors = 0
-          for (const file of files) {
-            const fileContents = (0, fs_1.readFileSync)(file, 'utf8')
-            // Skip empty files
-            if (!fileContents.trim()) {
-              core.debug(`Skipping empty file ${file}`)
-              continue
-            }
-            const response = yield fetch(`${axeLinterUrl}/lint-source`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: apiKey
-              },
-              body: JSON.stringify({
-                source: fileContents,
-                filename: file,
-                config: linterConfig
-              })
-            }).catch((error) => {
-              core.startGroup('Linter API Request Failed')
-              core.info(
-                JSON.stringify(
-                  {
-                    url: `${axeLinterUrl}/lint-source`,
-                    body: {
-                      source: fileContents,
-                      filename: file,
-                      config: linterConfig
-                    }
-                  },
-                  null,
-                  2
-                )
-              )
-              core.endGroup()
-              throw error
-            })
-            if (!response.ok) {
-              const data = {
-                status: response.status,
-                statusText: response.statusText,
-                fileUnderLint: file,
-                endpoint: response.url,
-                totalFiles: files.length,
-                files: files
-              }
-              core.startGroup('Linter API Details')
-              core.info(JSON.stringify(data, null, 2))
-              core.endGroup()
-              throw new Error(
-                `HTTP error ${response.status}: ${response.statusText}`
-              )
-            }
-            const contentType = response.headers.get('content-type')
-            if (
-              !(contentType === null || contentType === void 0
-                ? void 0
-                : contentType.includes('application/json'))
-            ) {
-              throw new Error('Invalid content type')
-            }
-            const result = yield response.json()
-            if (result.error) {
-              throw new Error(result.error)
-            }
-            const errors = result.report.errors
-            totalErrors += errors.length
-            // Report errors using GitHub annotations
-            for (const error of errors) {
-              core.error(
-                `${file}:${error.lineNumber} - ${error.ruleId} - ${error.description}\n${error.helpURL}`,
-                {
-                  file,
-                  startLine: error.lineNumber,
-                  startColumn: error.column,
-                  endColumn: error.endColumn,
-                  title: 'Axe Linter'
-                }
-              )
-            }
+      async function lintFiles(files, apiKey, axeLinterUrl, linterConfig) {
+        let totalErrors = 0
+        for (const file of files) {
+          const fileContents = (0, fs_1.readFileSync)(file, 'utf8')
+          // Skip empty files
+          if (!fileContents.trim()) {
+            core.debug(`Skipping empty file ${file}`)
+            continue
           }
-          core.debug(
-            `Found ${totalErrors} error${(0, utils_ts_1.pluralize)(totalErrors)}`
-          )
-          return totalErrors
-        })
+          const response = await fetch(`${axeLinterUrl}/lint-source`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: apiKey
+            },
+            body: JSON.stringify({
+              source: fileContents,
+              filename: file,
+              config: linterConfig
+            })
+          }).catch((error) => {
+            core.startGroup('Linter API Request Failed')
+            core.info(
+              JSON.stringify(
+                {
+                  url: `${axeLinterUrl}/lint-source`,
+                  body: {
+                    source: fileContents,
+                    filename: file,
+                    config: linterConfig
+                  }
+                },
+                null,
+                2
+              )
+            )
+            core.endGroup()
+            throw error
+          })
+          if (!response.ok) {
+            const data = {
+              status: response.status,
+              statusText: response.statusText,
+              fileUnderLint: file,
+              endpoint: response.url,
+              totalFiles: files.length,
+              files: files
+            }
+            core.startGroup('Linter API Details')
+            core.info(JSON.stringify(data, null, 2))
+            core.endGroup()
+            throw new Error(
+              `HTTP error ${response.status}: ${response.statusText}`
+            )
+          }
+          const contentType = response.headers.get('content-type')
+          if (!contentType?.includes('application/json')) {
+            throw new Error('Invalid content type')
+          }
+          const result = await response.json()
+          if (result.error) {
+            throw new Error(result.error)
+          }
+          const errors = result.report.errors
+          totalErrors += errors.length
+          // Report errors using GitHub annotations
+          for (const error of errors) {
+            core.error(
+              `${file}:${error.lineNumber} - ${error.ruleId} - ${error.description}\n${error.helpURL}`,
+              {
+                file,
+                startLine: error.lineNumber,
+                startColumn: error.column,
+                endColumn: error.endColumn,
+                title: 'Axe Linter'
+              }
+            )
+          }
+        }
+        core.debug(
+          `Found ${totalErrors} error${(0, utils_ts_1.pluralize)(totalErrors)}`
+        )
+        return totalErrors
       }
 
       /***/
     },
 
-    /***/ 9786: /***/ function (
+    /***/ 9786: /***/ (
       __unused_webpack_module,
       exports,
       __nccwpck_require__
-    ) {
+    ) => {
       'use strict'
 
-      var __awaiter =
-        (this && this.__awaiter) ||
-        function (thisArg, _arguments, P, generator) {
-          function adopt(value) {
-            return value instanceof P
-              ? value
-              : new P(function (resolve) {
-                  resolve(value)
-                })
-          }
-          return new (P || (P = Promise))(function (resolve, reject) {
-            function fulfilled(value) {
-              try {
-                step(generator.next(value))
-              } catch (e) {
-                reject(e)
-              }
-            }
-            function rejected(value) {
-              try {
-                step(generator['throw'](value))
-              } catch (e) {
-                reject(e)
-              }
-            }
-            function step(result) {
-              result.done
-                ? resolve(result.value)
-                : adopt(result.value).then(fulfilled, rejected)
-            }
-            step(
-              (generator = generator.apply(thisArg, _arguments || [])).next()
-            )
-          })
-        }
       Object.defineProperty(exports, '__esModule', { value: true })
       exports.getOnlyFiles = getOnlyFiles
       const fs_1 = __nccwpck_require__(9896)
@@ -74197,70 +74080,65 @@ ${pendingInterceptorsFormatter.format(pending)}
           .flatMap((pattern) => (0, fs_1.globSync)(pattern))
           .filter((file) => (0, fs_1.statSync)(file).isFile())
       }
-      function run(core) {
-        return __awaiter(this, void 0, void 0, function* () {
+      async function run(core) {
+        try {
+          const inputs = {
+            githubToken: core.getInput('github_token', { required: true }),
+            apiKey: core.getInput('api_key', { required: true }),
+            axeLinterUrl: core.getInput('axe_linter_url')
+          }
+          // Remove trailing slash if present
+          inputs.axeLinterUrl = inputs.axeLinterUrl.replace(/\/$/, '')
+          const onlyFiles = getOnlyFiles()
+          const filesToLint =
+            onlyFiles.length > 0
+              ? onlyFiles
+              : await (0, git_ts_1.getChangedFiles)(inputs.githubToken)
+          if (filesToLint.length === 0) {
+            core.debug('No files to lint')
+            return
+          }
+          // Load linter config if exists
+          let linterConfig = {}
           try {
-            const inputs = {
-              githubToken: core.getInput('github_token', { required: true }),
-              apiKey: core.getInput('api_key', { required: true }),
-              axeLinterUrl: core.getInput('axe_linter_url')
-            }
-            // Remove trailing slash if present
-            inputs.axeLinterUrl = inputs.axeLinterUrl.replace(/\/$/, '')
-            const onlyFiles = getOnlyFiles()
-            const filesToLint =
-              onlyFiles.length > 0
-                ? onlyFiles
-                : yield (0, git_ts_1.getChangedFiles)(inputs.githubToken)
-            if (filesToLint.length === 0) {
-              core.debug('No files to lint')
-              return
-            }
-            // Load linter config if exists
-            let linterConfig = {}
-            try {
-              const configFile = (0, fs_1.readFileSync)(
-                'axe-linter.yml',
-                'utf8'
-              )
-              const parsedConfig = (0, yaml_1.parse)(configFile)
-              if (parsedConfig && typeof parsedConfig === 'object') {
-                linterConfig = parsedConfig
-              }
-            } catch (error) {
-              if (error instanceof Error) {
-                core.debug(
-                  `Error loading axe-linter.yml no config found or invalid config: ${error.message}`
-                )
-              } else {
-                core.debug(
-                  'Error loading axe-linter.yml no config found or invalid config: ' +
-                    error
-                )
-              }
-            }
-            // Run linter
-            const errorCount = yield (0, linter_ts_1.lintFiles)(
-              filesToLint,
-              inputs.apiKey,
-              inputs.axeLinterUrl,
-              linterConfig
-            )
-            if (errorCount > 0) {
-              core.setFailed(
-                `Found ${errorCount} accessibility issue${(0, utils_ts_1.pluralize)(errorCount)}`
-              )
+            const configFile = (0, fs_1.readFileSync)('axe-linter.yml', 'utf8')
+            const parsedConfig = (0, yaml_1.parse)(configFile)
+            if (parsedConfig && typeof parsedConfig === 'object') {
+              linterConfig = parsedConfig
             }
           } catch (error) {
             if (error instanceof Error) {
-              core.setFailed(error.message)
+              core.debug(
+                `Error loading axe-linter.yml no config found or invalid config: ${error.message}`
+              )
             } else {
-              core.setFailed(
-                'An unexpected error occurred: ' + JSON.stringify(error)
+              core.debug(
+                'Error loading axe-linter.yml no config found or invalid config: ' +
+                  error
               )
             }
           }
-        })
+          // Run linter
+          const errorCount = await (0, linter_ts_1.lintFiles)(
+            filesToLint,
+            inputs.apiKey,
+            inputs.axeLinterUrl,
+            linterConfig
+          )
+          if (errorCount > 0) {
+            core.setFailed(
+              `Found ${errorCount} accessibility issue${(0, utils_ts_1.pluralize)(errorCount)}`
+            )
+          }
+        } catch (error) {
+          if (error instanceof Error) {
+            core.setFailed(error.message)
+          } else {
+            core.setFailed(
+              'An unexpected error occurred: ' + JSON.stringify(error)
+            )
+          }
+        }
       }
       exports['default'] = run
 
