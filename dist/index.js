@@ -38060,6 +38060,15 @@ ${pendingInterceptorsFormatter.format(pending)}
         '.markdown',
         '.liquid'
       ])
+      function isSupportedFile(filename) {
+        const hasDotSegment = filename
+          .split('/')
+          .some((seg) => seg.startsWith('.'))
+        return (
+          !hasDotSegment &&
+          FILE_EXTENSIONS.has((0, path_1.extname)(filename).toLowerCase())
+        )
+      }
       function getChangedFiles(token) {
         return __awaiter(this, void 0, void 0, function* () {
           var _a
@@ -38082,9 +38091,7 @@ ${pendingInterceptorsFormatter.format(pending)}
                     .filter(
                       (file) =>
                         file.status !== 'removed' &&
-                        FILE_EXTENSIONS.has(
-                          (0, path_1.extname)(file.filename).toLowerCase()
-                        )
+                        isSupportedFile(file.filename)
                     )
                     .map((file) => file.filename)) || []
             )
@@ -38097,10 +38104,7 @@ ${pendingInterceptorsFormatter.format(pending)}
           return response.data
             .filter(
               (file) =>
-                file.status !== 'removed' &&
-                FILE_EXTENSIONS.has(
-                  (0, path_1.extname)(file.filename).toLowerCase()
-                )
+                file.status !== 'removed' && isSupportedFile(file.filename)
             )
             .map((file) => file.filename)
         })

@@ -15,6 +15,11 @@ const FILE_EXTENSIONS = new Set([
   '.liquid'
 ])
 
+function isSupportedFile(filename: string): boolean {
+  const hasDotSegment = filename.split('/').some((seg) => seg.startsWith('.'))
+  return !hasDotSegment && FILE_EXTENSIONS.has(extname(filename).toLowerCase())
+}
+
 export async function getChangedFiles(token: string): Promise<string[]> {
   const octokit = github.getOctokit(token)
   const { context } = github
@@ -34,9 +39,7 @@ export async function getChangedFiles(token: string): Promise<string[]> {
     return (
       response.data.files
         ?.filter(
-          (file) =>
-            file.status !== 'removed' &&
-            FILE_EXTENSIONS.has(extname(file.filename).toLowerCase())
+          (file) => file.status !== 'removed' && isSupportedFile(file.filename)
         )
         .map((file) => file.filename) || []
     )
@@ -50,9 +53,7 @@ export async function getChangedFiles(token: string): Promise<string[]> {
 
   return response.data
     .filter(
-      (file) =>
-        file.status !== 'removed' &&
-        FILE_EXTENSIONS.has(extname(file.filename).toLowerCase())
+      (file) => file.status !== 'removed' && isSupportedFile(file.filename)
     )
     .map((file) => file.filename)
 }
