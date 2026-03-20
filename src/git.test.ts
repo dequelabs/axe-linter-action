@@ -296,6 +296,7 @@ describe('git', () => {
         { filename: 'index.html', status: 'modified' },
         { filename: 'public/about.htm', status: 'added' },
         { filename: 'templates/page.html', status: 'modified' },
+        { filename: 'templates/page.liquid', status: 'added' },
         { filename: 'docs/readme.txt', status: 'added' }, // Should not match
         { filename: 'styles/main.css', status: 'modified' } // Should not match
       ]
@@ -311,7 +312,8 @@ describe('git', () => {
       assert.includeMembers(result, [
         'index.html',
         'public/about.htm',
-        'templates/page.html'
+        'templates/page.html',
+        'templates/page.liquid'
       ])
       assert.notInclude(result, 'docs/readme.txt')
       assert.notInclude(result, 'styles/main.css')
@@ -324,7 +326,8 @@ describe('git', () => {
         { filename: 'docs/README.MD', status: 'added' },
         { filename: 'docs/test.MaRkDoWn', status: 'added' },
         { filename: 'public/INDEX.HTML', status: 'modified' },
-        { filename: 'src/Test.VUE', status: 'added' }
+        { filename: 'src/Test.VUE', status: 'added' },
+        { filename: 'templates/page.LIQUID', status: 'added' }
       ]
 
       mockOctokit.rest.repos.compareCommits.resolves({
@@ -341,7 +344,8 @@ describe('git', () => {
         'docs/README.MD',
         'docs/test.MaRkDoWn',
         'public/INDEX.HTML',
-        'src/Test.VUE'
+        'src/Test.VUE',
+        'templates/page.LIQUID'
       ])
     })
 

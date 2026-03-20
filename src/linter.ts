@@ -34,7 +34,19 @@ export async function lintFiles(
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      const data = {
+        status: response.status,
+        statusText: response.statusText,
+        fileUnderLint: file,
+        endpoint: response.url,
+        totalFiles: files.length,
+        files: files
+      }
+      core.startGroup('Linter API Details')
+      core.info(JSON.stringify(data, null, 2))
+      core.endGroup()
+
+      throw new Error(`HTTP error ${response.status}: ${response.statusText}`)
     }
 
     const contentType = response.headers.get('content-type')
