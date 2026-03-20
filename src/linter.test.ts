@@ -1,9 +1,15 @@
-import { describe, it, beforeEach, afterEach, mock } from 'node:test'
+import {
+  describe,
+  it,
+  before,
+  beforeEach,
+  afterEach,
+  after,
+  mock
+} from 'node:test'
 import assert from 'node:assert/strict'
-import * as core from '@actions/core'
 import { MockAgent, setGlobalDispatcher, type Interceptable } from 'undici'
-import { lintFiles } from './linter'
-import type { LinterResponse } from './types'
+import type { LinterResponse } from './types.ts'
 
 type MockResponses = Record<string, LinterResponse>
 
@@ -25,6 +31,7 @@ describe('linter', () => {
   let errorStub: any
   let debugStub: any
   let readFileMock: any
+  let lintFiles: typeof import('./linter.ts').lintFiles
 
   describe('lintFiles', () => {
     const apiKey = 'test-api-key'
@@ -34,18 +41,35 @@ describe('linter', () => {
     let mockAgent: MockAgent
     let mockPool: Interceptable
 
+    before(async () => {
+      errorStub = mock.fn()
+      debugStub = mock.fn()
+      readFileMock = mock.fn(() => '')
+
+      mock.module('@actions/core', {
+        namedExports: {
+          error: errorStub,
+          debug: debugStub,
+          startGroup: mock.fn(),
+          info: mock.fn(),
+          endGroup: mock.fn()
+        }
+      })
+
+      mock.module('fs', {
+        namedExports: { readFileSync: readFileMock }
+      })
+
+      const mod = await import('./linter.ts')
+      lintFiles = mod.lintFiles
+    })
+
     beforeEach(() => {
-      // Stub core functions
-      errorStub = mock.method(core, 'error', () => {})
-      debugStub = mock.method(core, 'debug', () => {})
-      mock.method(core, 'startGroup', () => {})
-      mock.method(core, 'info', () => {})
-      mock.method(core, 'endGroup', () => {})
+      errorStub.mock.resetCalls()
+      debugStub.mock.resetCalls()
+      readFileMock.mock.resetCalls()
+      readFileMock.mock.mockImplementation(() => '')
 
-      // Stub file system
-      readFileMock = mock.method(require('fs'), 'readFileSync', () => '')
-
-      // Enable mock agent
       mockAgent = new MockAgent()
       setGlobalDispatcher(mockAgent)
       mockAgent.disableNetConnect()
@@ -53,8 +77,11 @@ describe('linter', () => {
     })
 
     afterEach(async () => {
-      mock.restoreAll()
       await mockAgent.close()
+    })
+
+    after(() => {
+      mock.restoreAll()
     })
 
     it('should process files and return total error count', async () => {
@@ -64,12 +91,10 @@ describe('linter', () => {
         'test.html': '<div>test</div>'
       }
 
-      // Mock file reads
       readFileMock.mock.mockImplementation(
         (path: string) => fileContents[path] ?? ''
       )
 
-      // Mock linter responses
       const mockResponses: MockResponses = {
         'test.js': {
           report: {
@@ -101,7 +126,6 @@ describe('linter', () => {
         }
       }
 
-      // Setup interceptors for each file
       files.forEach((file) => {
         mockPool
           .intercept({
@@ -132,7 +156,6 @@ describe('linter', () => {
       assert.equal(errorCount, 2, 'should return correct total error count')
       assert.equal(errorStub.mock.callCount(), 2, 'should report each error')
 
-      // Verify error reporting
       assert.ok(
         wasCalledWith(
           errorStub,
@@ -342,20 +365,20 @@ describe('linter', () => {
         () => '<div><h1>hello world</h1></div>'
       )
 
-      // Make fetch throw a non-Error object
       const nonErrorObject = {
         type: 'CustomError',
         details: 'Something went wrong',
         statusCode: 500
       }
 
-      mock.method(globalThis, 'fetch', () => Promise.reject(nonErrorObject))
+      const fetchMock = mock.method(globalThis, 'fetch', () =>
+        Promise.reject(nonErrorObject)
+      )
 
       try {
         await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
         assert.fail('Should have thrown an error')
       } catch (error) {
-        // Verify that the caught error is our non-Error object
         assert.strictEqual(
           error instanceof Error,
           false,
@@ -381,6 +404,8 @@ describe('linter', () => {
           500,
           'Should preserve status code'
         )
+      } finally {
+        fetchMock.mock.restore()
       }
     })
 
@@ -392,10 +417,8 @@ describe('linter', () => {
         }
       }
 
-      // Setup file read
       readFileMock.mock.mockImplementation(() => 'const x = 1;')
 
-      // Setup interceptor to simulate connection error
       mockPool
         .intercept({
           path: '/lint-source',

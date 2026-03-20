@@ -1,6 +1,6 @@
 {
   "nodeOptions": {
-    "require": "ts-node/register",
+    "experimental-strip-types": true,
     "enable-source-maps": true
   },
   "test": {

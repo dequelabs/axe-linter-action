@@ -1,8 +1,5 @@
-import { describe, it, beforeEach, afterEach, mock } from 'node:test'
+import { describe, it, before, beforeEach, after, mock } from 'node:test'
 import assert from 'node:assert/strict'
-import * as github from '@actions/github'
-import * as core from '@actions/core'
-import { getChangedFiles } from './git'
 
 function wasCalledWith(fn: any, ...expectedArgs: unknown[]): boolean {
   return fn.mock.calls.some((call: any) => {
@@ -24,12 +21,12 @@ describe('git', () => {
   let mockContext: any
   let githubStub: any
   let debugStub: any
-  let originalContext: typeof github.context
+  let getChangedFiles: typeof import('./git.ts').getChangedFiles
 
-  beforeEach(() => {
-    debugStub = mock.method(core, 'debug', () => {})
+  before(async () => {
+    debugStub = mock.fn()
+    githubStub = mock.fn()
 
-    // Mock Octokit responses
     mockOctokit = {
       rest: {
         repos: {
@@ -43,7 +40,6 @@ describe('git', () => {
       }
     }
 
-    // Mock GitHub context
     mockContext = {
       repo: {
         owner: 'test-owner',
@@ -52,34 +48,52 @@ describe('git', () => {
       payload: {}
     }
 
-    // Stub GitHub getOctokit
-    githubStub = mock.method(github, 'getOctokit', () => mockOctokit)
-    originalContext = github.context
-    Object.defineProperty(github, 'context', {
-      value: mockContext,
-      writable: true,
-      configurable: true
+    githubStub.mock.mockImplementation(() => mockOctokit)
+
+    mock.module('@actions/core', {
+      namedExports: { debug: debugStub }
     })
+
+    mock.module('@actions/github', {
+      namedExports: {
+        getOctokit: githubStub,
+        context: mockContext
+      }
+    })
+
+    const mod = await import('./git.ts')
+    getChangedFiles = mod.getChangedFiles
   })
 
-  afterEach(() => {
-    Object.defineProperty(github, 'context', {
-      value: originalContext,
-      writable: true,
-      configurable: true
-    })
+  beforeEach(() => {
+    debugStub.mock.resetCalls()
+    githubStub.mock.resetCalls()
+    githubStub.mock.mockImplementation(() => mockOctokit)
+
+    mockOctokit.rest.repos.compareCommits.mock.resetCalls()
+    mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+      Promise.resolve({ data: { files: [] } })
+    )
+    mockOctokit.rest.pulls.listFiles.mock.resetCalls()
+    mockOctokit.rest.pulls.listFiles.mock.mockImplementation(() =>
+      Promise.resolve({ data: [] })
+    )
+
+    mockContext.payload = {}
+  })
+
+  after(() => {
     mock.restoreAll()
   })
 
   describe('getChangedFiles', () => {
     it('should handle pull request files', async () => {
-      // Setup pull request context
       mockContext.payload.pull_request = { number: 123 }
 
       const mockFiles = [
         { filename: 'test.js' },
         { filename: 'test.md' },
-        { filename: 'test.css' }, // Should be filtered out
+        { filename: 'test.css' },
         { filename: 'test.tsx' }
       ]
 
@@ -110,14 +124,13 @@ describe('git', () => {
     })
 
     it('should handle push event files', async () => {
-      // Setup push context
       mockContext.payload.before = 'old-sha'
       mockContext.payload.after = 'new-sha'
 
       const mockFiles = [
         { filename: 'test.jsx' },
         { filename: 'test.vue' },
-        { filename: 'test.py' }, // Should be filtered out
+        { filename: 'test.py' },
         { filename: 'test.html' }
       ]
 
@@ -289,8 +302,8 @@ describe('git', () => {
         { filename: 'test/test.js', status: 'modified' },
         { filename: 'src/components/Button.jsx', status: 'added' },
         { filename: 'src/utils/helper.esm', status: 'modified' },
-        { filename: 'src/types.ts', status: 'added' }, // Should not match
-        { filename: 'src/styles.css', status: 'modified' } // Should not match
+        { filename: 'src/types.ts', status: 'added' },
+        { filename: 'src/styles.css', status: 'modified' }
       ]
 
       mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
@@ -317,8 +330,8 @@ describe('git', () => {
         { filename: 'public/about.htm', status: 'added' },
         { filename: 'templates/page.html', status: 'modified' },
         { filename: 'templates/page.liquid', status: 'added' },
-        { filename: 'docs/readme.txt', status: 'added' }, // Should not match
-        { filename: 'styles/main.css', status: 'modified' } // Should not match
+        { filename: 'docs/readme.txt', status: 'added' },
+        { filename: 'styles/main.css', status: 'modified' }
       ]
 
       mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
@@ -397,11 +410,11 @@ describe('git', () => {
 
     it('should handle files without extensions correctly', async () => {
       const mockFiles = [
-        { filename: 'README', status: 'modified' }, // Should not match
-        { filename: 'LICENSE', status: 'added' }, // Should not match
-        { filename: 'docs/markdown', status: 'modified' }, // Should not match
-        { filename: 'test.html', status: 'added' }, // Should match
-        { filename: 'test.', status: 'modified' } // Should not match
+        { filename: 'README', status: 'modified' },
+        { filename: 'LICENSE', status: 'added' },
+        { filename: 'docs/markdown', status: 'modified' },
+        { filename: 'test.html', status: 'added' },
+        { filename: 'test.', status: 'modified' }
       ]
 
       mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
@@ -458,7 +471,6 @@ describe('git', () => {
     })
 
     it('should handle push event diff correctly', async () => {
-      // Setup push event context
       mockContext.payload = {
         before: 'old-sha',
         after: 'new-sha'
@@ -469,12 +481,9 @@ describe('git', () => {
         { filename: 'test/test.jsx', status: 'modified' }
       ]
 
-      // Setup compareCommits response
-      mockOctokit.rest.repos = {
-        compareCommits: mock.fn(() =>
-          Promise.resolve({ data: { files: mockFiles } })
-        )
-      }
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
 
       const result = await getChangedFiles(token)
 
