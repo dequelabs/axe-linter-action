@@ -1,30 +1,44 @@
-import { describe, it, beforeEach, afterEach } from 'node:test'
+import { describe, it, beforeEach, afterEach, mock } from 'node:test'
 import assert from 'node:assert/strict'
-import sinon from 'sinon'
 import * as github from '@actions/github'
 import * as core from '@actions/core'
 import { getChangedFiles } from './git'
 
+function wasCalledWith(fn: any, ...expectedArgs: unknown[]): boolean {
+  return fn.mock.calls.some((call: any) => {
+    try {
+      assert.deepStrictEqual(
+        call.arguments.slice(0, expectedArgs.length),
+        expectedArgs
+      )
+      return true
+    } catch {
+      return false
+    }
+  })
+}
+
 describe('git', () => {
   const token = 'test-token'
-  let sandbox: sinon.SinonSandbox
   let mockOctokit: any
   let mockContext: any
-  let githubStub: sinon.SinonStub
-  let debugStub: sinon.SinonStub
+  let githubStub: any
+  let debugStub: any
+  let originalContext: typeof github.context
 
   beforeEach(() => {
-    sandbox = sinon.createSandbox()
-    debugStub = sandbox.stub(core, 'debug')
+    debugStub = mock.method(core, 'debug', () => {})
 
     // Mock Octokit responses
     mockOctokit = {
       rest: {
         repos: {
-          compareCommits: sandbox.stub()
+          compareCommits: mock.fn(() =>
+            Promise.resolve({ data: { files: [] } })
+          )
         },
         pulls: {
-          listFiles: sandbox.stub()
+          listFiles: mock.fn(() => Promise.resolve({ data: [] }))
         }
       }
     }
@@ -39,12 +53,22 @@ describe('git', () => {
     }
 
     // Stub GitHub getOctokit
-    githubStub = sandbox.stub(github, 'getOctokit').returns(mockOctokit)
-    sandbox.stub(github, 'context').value(mockContext)
+    githubStub = mock.method(github, 'getOctokit', () => mockOctokit)
+    originalContext = github.context
+    Object.defineProperty(github, 'context', {
+      value: mockContext,
+      writable: true,
+      configurable: true
+    })
   })
 
   afterEach(() => {
-    sandbox.restore()
+    Object.defineProperty(github, 'context', {
+      value: originalContext,
+      writable: true,
+      configurable: true
+    })
+    mock.restoreAll()
   })
 
   describe('getChangedFiles', () => {
@@ -59,24 +83,22 @@ describe('git', () => {
         { filename: 'test.tsx' }
       ]
 
-      mockOctokit.rest.pulls.listFiles.resolves({
-        data: mockFiles
-      })
+      mockOctokit.rest.pulls.listFiles.mock.mockImplementation(() =>
+        Promise.resolve({ data: mockFiles })
+      )
 
       const result = await getChangedFiles(token)
 
-      assert.strictEqual(
-        githubStub.calledWith(token),
-        true,
+      assert.ok(
+        wasCalledWith(githubStub, token),
         'getOctokit should be called with correct token'
       )
-      assert.strictEqual(
-        mockOctokit.rest.pulls.listFiles.calledWith({
+      assert.ok(
+        wasCalledWith(mockOctokit.rest.pulls.listFiles, {
           owner: 'test-owner',
           repo: 'test-repo',
           pull_number: 123
         }),
-        true,
         'listFiles should be called with correct parameters'
       )
 
@@ -99,27 +121,23 @@ describe('git', () => {
         { filename: 'test.html' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
 
       const result = await getChangedFiles(token)
 
-      assert.strictEqual(
-        githubStub.calledWith(token),
-        true,
+      assert.ok(
+        wasCalledWith(githubStub, token),
         'getOctokit should be called with correct token'
       )
-      assert.strictEqual(
-        mockOctokit.rest.repos.compareCommits.calledWith({
+      assert.ok(
+        wasCalledWith(mockOctokit.rest.repos.compareCommits, {
           owner: 'test-owner',
           repo: 'test-repo',
           base: 'old-sha',
           head: 'new-sha'
         }),
-        true,
         'compareCommits should be called with correct parameters'
       )
 
@@ -128,9 +146,8 @@ describe('git', () => {
         ['test.jsx', 'test.vue', 'test.html'],
         'should return correct filtered files'
       )
-      assert.strictEqual(
-        debugStub.calledWith('Not a pull request, checking push diff'),
-        true,
+      assert.ok(
+        wasCalledWith(debugStub, 'Not a pull request, checking push diff'),
         'should log debug message'
       )
     })
@@ -138,9 +155,9 @@ describe('git', () => {
     it('should handle empty file lists', async () => {
       mockContext.payload.pull_request = { number: 123 }
 
-      mockOctokit.rest.pulls.listFiles.resolves({
-        data: []
-      })
+      mockOctokit.rest.pulls.listFiles.mock.mockImplementation(() =>
+        Promise.resolve({ data: [] })
+      )
 
       const result = await getChangedFiles(token)
 
@@ -152,11 +169,9 @@ describe('git', () => {
       mockContext.payload.before = 'old-sha'
       mockContext.payload.after = 'new-sha'
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: undefined
-        }
-      })
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: undefined } })
+      )
 
       const result = await getChangedFiles(token)
 
@@ -173,9 +188,9 @@ describe('git', () => {
         { filename: 'test.rb' }
       ]
 
-      mockOctokit.rest.pulls.listFiles.resolves({
-        data: mockFiles
-      })
+      mockOctokit.rest.pulls.listFiles.mock.mockImplementation(() =>
+        Promise.resolve({ data: mockFiles })
+      )
 
       const result = await getChangedFiles(token)
 
@@ -187,7 +202,9 @@ describe('git', () => {
       mockContext.payload.pull_request = { number: 123 }
 
       const error = new Error('API Error')
-      mockOctokit.rest.pulls.listFiles.rejects(error)
+      mockOctokit.rest.pulls.listFiles.mock.mockImplementation(() =>
+        Promise.reject(error)
+      )
 
       try {
         await getChangedFiles(token)
@@ -208,9 +225,9 @@ describe('git', () => {
         { filename: 'test.tsx', status: 'added' }
       ]
 
-      mockOctokit.rest.pulls.listFiles.resolves({
-        data: mockFiles
-      })
+      mockOctokit.rest.pulls.listFiles.mock.mockImplementation(() =>
+        Promise.resolve({ data: mockFiles })
+      )
 
       const result = await getChangedFiles(token)
 
@@ -230,20 +247,17 @@ describe('git', () => {
         { filename: 'removed.md', status: 'removed' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
 
       const result = await getChangedFiles(token)
 
       assert.deepEqual(result, ['test.vue', 'test.html'])
       assert.ok(!result.includes('deleted.js'))
       assert.ok(!result.includes('removed.md'))
-      assert.strictEqual(
-        debugStub.calledWith('Not a pull request, checking push diff'),
-        true
+      assert.ok(
+        wasCalledWith(debugStub, 'Not a pull request, checking push diff')
       )
     })
 
@@ -258,9 +272,9 @@ describe('git', () => {
         { filename: 'test5.js', status: 'changed' }
       ]
 
-      mockOctokit.rest.pulls.listFiles.resolves({
-        data: mockFiles
-      })
+      mockOctokit.rest.pulls.listFiles.mock.mockImplementation(() =>
+        Promise.resolve({ data: mockFiles })
+      )
 
       const result = await getChangedFiles(token)
 
@@ -279,11 +293,9 @@ describe('git', () => {
         { filename: 'src/styles.css', status: 'modified' } // Should not match
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
 
       const result = await getChangedFiles(token)
 
@@ -309,11 +321,9 @@ describe('git', () => {
         { filename: 'styles/main.css', status: 'modified' } // Should not match
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
 
       const result = await getChangedFiles(token)
 
@@ -340,11 +350,9 @@ describe('git', () => {
         { filename: 'templates/page.LIQUID', status: 'added' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
 
       const result = await getChangedFiles(token)
 
@@ -370,11 +378,9 @@ describe('git', () => {
         { filename: 'deep/path/app.vue', status: 'added' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
 
       const result = await getChangedFiles(token)
 
@@ -398,11 +404,9 @@ describe('git', () => {
         { filename: 'test.', status: 'modified' } // Should not match
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
 
       const result = await getChangedFiles(token)
 
@@ -422,9 +426,9 @@ describe('git', () => {
         { filename: 'src/app.js', status: 'added' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: { files: mockFiles }
-      })
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
 
       const result = await getChangedFiles(token)
 
@@ -441,9 +445,9 @@ describe('git', () => {
         { filename: 'docs/guide.md', status: 'added' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: { files: mockFiles }
-      })
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
 
       const result = await getChangedFiles(token)
 
@@ -467,11 +471,9 @@ describe('git', () => {
 
       // Setup compareCommits response
       mockOctokit.rest.repos = {
-        compareCommits: sandbox.stub().resolves({
-          data: {
-            files: mockFiles
-          }
-        })
+        compareCommits: mock.fn(() =>
+          Promise.resolve({ data: { files: mockFiles } })
+        )
       }
 
       const result = await getChangedFiles(token)

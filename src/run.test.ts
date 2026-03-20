@@ -1,46 +1,65 @@
-import { describe, it, beforeEach, afterEach } from 'node:test'
+import { describe, it, beforeEach, afterEach, mock } from 'node:test'
 import assert from 'node:assert/strict'
-import * as sinon from 'sinon'
 import { stringify } from 'yaml'
 import run, { getOnlyFiles } from './run'
 import * as gitModule from './git'
 import * as linterModule from './linter'
 import { Core } from './types'
 
+function wasCalledWith(fn: any, ...expectedArgs: unknown[]): boolean {
+  return fn.mock.calls.some((call: any) => {
+    try {
+      assert.deepStrictEqual(
+        call.arguments.slice(0, expectedArgs.length),
+        expectedArgs
+      )
+      return true
+    } catch {
+      return false
+    }
+  })
+}
+
 describe('run', () => {
-  let sandbox: sinon.SinonSandbox
   let mockCore: Core
-  let readFileStub: sinon.SinonStub
-  let globSyncStub: sinon.SinonStub
-  let getChangedFilesStub: sinon.SinonStub
-  let lintFilesStub: sinon.SinonStub
+  let getInputMock: any
+  let setFailedMock: any
+  let infoMock: any
+  let debugMock: any
+  let setOutputMock: any
+  let readFileMock: any
+  let globSyncMock: any
+  let getChangedFilesMock: any
+  let lintFilesMock: any
 
   beforeEach(() => {
-    sandbox = sinon.createSandbox()
-
     // Create mock Core implementation
+    getInputMock = mock.fn(() => '')
+    setFailedMock = mock.fn()
+    infoMock = mock.fn()
+    debugMock = mock.fn()
+    setOutputMock = mock.fn()
+
     mockCore = {
-      getInput: sandbox.stub(),
-      setFailed: sandbox.stub(),
-      info: sandbox.stub(),
-      debug: sandbox.stub(),
-      setOutput: sandbox.stub()
-    }
+      getInput: getInputMock,
+      setFailed: setFailedMock,
+      info: infoMock,
+      debug: debugMock,
+      setOutput: setOutputMock
+    } as unknown as Core
 
     // Stub file system
-    readFileStub = sandbox.stub()
-    globSyncStub = sandbox.stub()
-    sandbox.replace(require('fs'), 'readFileSync', readFileStub)
-    sandbox.replace(require('fs'), 'globSync', globSyncStub)
-    sandbox.replace(
-      require('fs'),
-      'statSync',
-      sandbox.stub().returns({ isFile: () => true })
-    )
+    readFileMock = mock.method(require('fs'), 'readFileSync', () => '')
+    globSyncMock = mock.method(require('fs'), 'globSync', () => [])
+    mock.method(require('fs'), 'statSync', () => ({ isFile: () => true }))
 
     // Stub git and linter functions
-    getChangedFilesStub = sandbox.stub(gitModule, 'getChangedFiles')
-    lintFilesStub = sandbox.stub(linterModule, 'lintFiles')
+    getChangedFilesMock = mock.method(gitModule, 'getChangedFiles', () =>
+      Promise.resolve([])
+    )
+    lintFilesMock = mock.method(linterModule, 'lintFiles', () =>
+      Promise.resolve(0)
+    )
 
     // Clear env var by default
     delete process.env.AXE_LINTER_ONLY
@@ -48,277 +67,212 @@ describe('run', () => {
 
   afterEach(() => {
     delete process.env.AXE_LINTER_ONLY
-    sandbox.restore()
+    mock.restoreAll()
   })
 
+  function setupInputs(overrides: Record<string, string | Error> = {}) {
+    const defaults: Record<string, string> = {
+      github_token: 'test-token',
+      api_key: 'test-api-key',
+      axe_linter_url: ''
+    }
+    const inputs: Record<string, string | Error> = { ...defaults, ...overrides }
+
+    getInputMock.mock.mockImplementation((name: string) => {
+      const val = inputs[name]
+      if (val instanceof Error) throw val
+      return val ?? ''
+    })
+  }
+
   it('should process files successfully with no errors', async () => {
-    // Setup inputs
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('github_token', { required: true })
-      .returns('test-token')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('api_key', { required: true })
-      .returns('test-api-key')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('axe_linter_url')
-      .returns('https://test-linter.com/')
+    setupInputs({ axe_linter_url: 'https://test-linter.com/' })
 
-    // Setup changed files
-    getChangedFilesStub.resolves(['test.js', 'test.html'])
+    getChangedFilesMock.mock.mockImplementation(() =>
+      Promise.resolve(['test.js', 'test.html'])
+    )
 
-    // Setup config file
     const mockConfig = { rules: { 'test-rule': 'error' } }
-    readFileStub
-      .withArgs('axe-linter.yml', 'utf8')
-      .returns(stringify(mockConfig))
+    readFileMock.mock.mockImplementation((path: string) => {
+      if (path === 'axe-linter.yml') return stringify(mockConfig)
+      return ''
+    })
 
-    // Setup linter response
-    lintFilesStub.resolves(0)
+    lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
 
     await run(mockCore)
 
     // Verify inputs were processed correctly
-    assert.strictEqual(
-      (mockCore.getInput as sinon.SinonStub).calledWith('github_token', {
-        required: true
-      }),
-      true
-    )
-    assert.strictEqual(
-      (mockCore.getInput as sinon.SinonStub).calledWith('api_key', {
-        required: true
-      }),
-      true
-    )
+    assert.ok(wasCalledWith(getInputMock, 'github_token', { required: true }))
+    assert.ok(wasCalledWith(getInputMock, 'api_key', { required: true }))
     // Verify files were processed
-    assert.strictEqual(getChangedFilesStub.calledWith('test-token'), true)
+    assert.ok(wasCalledWith(getChangedFilesMock, 'test-token'))
 
-    assert.strictEqual(
-      lintFilesStub.calledWith(
+    assert.ok(
+      wasCalledWith(
+        lintFilesMock,
         ['test.js', 'test.html'],
         'test-api-key',
         'https://test-linter.com',
         mockConfig
-      ),
-      true
+      )
     )
 
     // Verify no errors were reported
-    assert.strictEqual((mockCore.setFailed as sinon.SinonStub).called, false)
+    assert.strictEqual(setFailedMock.mock.callCount(), 0)
   })
 
   it('should handle no changed files', async () => {
-    // Setup inputs
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('github_token', { required: true })
-      .returns('test-token')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('api_key', { required: true })
-      .returns('test-api-key')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('axe_linter_url')
-      .returns('https://test-linter.com')
+    setupInputs({ axe_linter_url: 'https://test-linter.com' })
 
-    // Return empty file list
-    getChangedFilesStub.resolves([])
+    getChangedFilesMock.mock.mockImplementation(() => Promise.resolve([]))
 
     await run(mockCore)
 
-    assert.strictEqual(
-      (mockCore.debug as sinon.SinonStub).calledWith('No files to lint'),
-      true,
+    assert.ok(
+      wasCalledWith(debugMock, 'No files to lint'),
       'Should log debug message for no files'
     )
     assert.strictEqual(
-      lintFilesStub.called,
-      false,
+      lintFilesMock.mock.callCount(),
+      0,
       'Linter should not be called with no files'
     )
     assert.strictEqual(
-      (mockCore.setFailed as sinon.SinonStub).called,
-      false,
+      setFailedMock.mock.callCount(),
+      0,
       'Should not set failed status'
     )
 
     // Verify readFileSync was not called
     assert.strictEqual(
-      readFileStub.called,
-      false,
+      readFileMock.mock.callCount(),
+      0,
       'Should not attempt to read any files'
     )
   })
 
   it('should handle missing config file', async () => {
-    // Setup inputs
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('github_token', { required: true })
-      .returns('test-token')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('api_key', { required: true })
-      .returns('test-api-key')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('axe_linter_url')
-      .returns('') // This will use the default URL
+    setupInputs()
 
-    getChangedFilesStub.resolves(['test.js'])
+    getChangedFilesMock.mock.mockImplementation(() =>
+      Promise.resolve(['test.js'])
+    )
 
-    readFileStub.withArgs('axe-linter.yml', 'utf8').throws(new Error('ENOENT'))
+    readFileMock.mock.mockImplementation((path: string) => {
+      if (path === 'axe-linter.yml') throw new Error('ENOENT')
+      return ''
+    })
 
-    lintFilesStub.resolves(0)
+    lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
 
     await run(mockCore)
 
     // Verify debug message for missing config
-    assert.strictEqual(
-      (mockCore.debug as sinon.SinonStub).calledWith(
+    assert.ok(
+      wasCalledWith(
+        debugMock,
         'Error loading axe-linter.yml no config found or invalid config: ENOENT'
       ),
-      true,
       'Should log correct debug message for missing config'
     )
 
     // Verify linter was called with correct parameters
-    assert.strictEqual(
-      lintFilesStub.calledWith(['test.js'], 'test-api-key', '', {}),
-      true,
+    assert.ok(
+      wasCalledWith(lintFilesMock, ['test.js'], 'test-api-key', '', {}),
       'Should call linter with default config'
     )
 
     // Verify readFileSync was called correctly
-    assert.strictEqual(
-      readFileStub.calledWith('axe-linter.yml', 'utf8'),
-      true,
+    assert.ok(
+      wasCalledWith(readFileMock, 'axe-linter.yml', 'utf8'),
       'Should attempt to read config file'
     )
 
     // Verify setFailed was not called since linter returned 0 errors
     assert.strictEqual(
-      (mockCore.setFailed as sinon.SinonStub).called,
-      false,
+      setFailedMock.mock.callCount(),
+      0,
       'Should not set failed status'
     )
   })
 
   it('should handle linter errors', async () => {
-    // Setup inputs
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('github_token', { required: true })
-      .returns('test-token')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('api_key', { required: true })
-      .returns('test-api-key')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('axe_linter_url')
-      .returns('https://test-linter.com')
+    setupInputs({ axe_linter_url: 'https://test-linter.com' })
 
-    getChangedFilesStub.resolves(['test.js'])
+    getChangedFilesMock.mock.mockImplementation(() =>
+      Promise.resolve(['test.js'])
+    )
 
-    readFileStub
-      .withArgs('axe-linter.yml', 'utf8')
-      .returns('rules:\n  test-rule: error')
+    readFileMock.mock.mockImplementation((path: string) => {
+      if (path === 'axe-linter.yml') return 'rules:\n  test-rule: error'
+      return ''
+    })
 
-    lintFilesStub.resolves(2)
+    lintFilesMock.mock.mockImplementation(() => Promise.resolve(2))
 
     await run(mockCore)
 
-    assert.strictEqual(
-      (mockCore.setFailed as sinon.SinonStub).calledWith(
-        'Found 2 accessibility issues'
-      ),
-      true
-    )
+    assert.ok(wasCalledWith(setFailedMock, 'Found 2 accessibility issues'))
   })
 
   it('should handle single linter error', async () => {
-    // Setup inputs
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('github_token', { required: true })
-      .returns('test-token')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('api_key', { required: true })
-      .returns('test-api-key')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('axe_linter_url')
-      .returns('https://test-linter.com')
+    setupInputs({ axe_linter_url: 'https://test-linter.com' })
 
-    getChangedFilesStub.resolves(['test.js'])
+    getChangedFilesMock.mock.mockImplementation(() =>
+      Promise.resolve(['test.js'])
+    )
 
-    readFileStub
-      .withArgs('axe-linter.yml', 'utf8')
-      .returns('rules:\n  test-rule: error')
+    readFileMock.mock.mockImplementation((path: string) => {
+      if (path === 'axe-linter.yml') return 'rules:\n  test-rule: error'
+      return ''
+    })
 
-    lintFilesStub.resolves(1)
+    lintFilesMock.mock.mockImplementation(() => Promise.resolve(1))
 
     await run(mockCore)
 
-    assert.strictEqual(
-      (mockCore.setFailed as sinon.SinonStub).calledWith(
-        'Found 1 accessibility issue'
-      ),
-      true
-    )
+    assert.ok(wasCalledWith(setFailedMock, 'Found 1 accessibility issue'))
   })
 
   it('should handle missing required inputs', async () => {
-    // Simulate missing required input
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('github_token', { required: true })
-      .throws(new Error('Input required and not supplied: github_token'))
+    setupInputs({
+      github_token: new Error('Input required and not supplied: github_token')
+    })
 
     await run(mockCore)
 
-    assert.strictEqual(
-      (mockCore.setFailed as sinon.SinonStub).calledWith(
+    assert.ok(
+      wasCalledWith(
+        setFailedMock,
         'Input required and not supplied: github_token'
-      ),
-      true
+      )
     )
   })
 
   it('should handle git error', async () => {
-    // Setup inputs
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('github_token', { required: true })
-      .returns('test-token')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('api_key', { required: true })
-      .returns('test-api-key')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('axe_linter_url')
-      .returns('https://test-linter.com')
+    setupInputs({ axe_linter_url: 'https://test-linter.com' })
 
-    // Simulate git error
     const error = new Error('Git error')
-    getChangedFilesStub.rejects(error)
+    getChangedFilesMock.mock.mockImplementation(() => Promise.reject(error))
 
     await run(mockCore)
 
-    assert.strictEqual(
-      (mockCore.setFailed as sinon.SinonStub).calledWith('Git error'),
-      true
-    )
+    assert.ok(wasCalledWith(setFailedMock, 'Git error'))
   })
 
   it('should handle non-Error exceptions', async () => {
-    // Setup inputs
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('github_token', { required: true })
-      .returns('test-token')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('api_key', { required: true })
-      .returns('test-api-key')
-    ;(mockCore.getInput as sinon.SinonStub)
-      .withArgs('axe_linter_url')
-      .returns('')
+    setupInputs()
 
-    // Simulate a non-Error object being thrown
-    getChangedFilesStub.rejects({ foo: 'bar' })
+    getChangedFilesMock.mock.mockImplementation(() =>
+      Promise.reject({ foo: 'bar' })
+    )
 
     await run(mockCore)
 
     // Verify setFailed was called with the correct message
     assert.strictEqual(
-      (mockCore.setFailed as sinon.SinonStub).getCall(0).args[0],
+      setFailedMock.mock.calls[0].arguments[0],
       'An unexpected error occurred: {"foo":"bar"}'
     )
   })
@@ -326,113 +280,96 @@ describe('run', () => {
   describe('AXE_LINTER_ONLY', () => {
     it('should lint only the specified files, ignoring changed files', async () => {
       process.env.AXE_LINTER_ONLY = 'fixtures/**'
-      ;(mockCore.getInput as sinon.SinonStub)
-        .withArgs('github_token', { required: true })
-        .returns('test-token')
-      ;(mockCore.getInput as sinon.SinonStub)
-        .withArgs('api_key', { required: true })
-        .returns('test-api-key')
-      ;(mockCore.getInput as sinon.SinonStub)
-        .withArgs('axe_linter_url')
-        .returns('https://test-linter.com')
+      setupInputs({ axe_linter_url: 'https://test-linter.com' })
 
-      globSyncStub.withArgs('fixtures/**').returns(['fixtures/accessible.html'])
-      readFileStub
-        .withArgs('axe-linter.yml', 'utf8')
-        .throws(new Error('ENOENT'))
-      lintFilesStub.resolves(0)
+      globSyncMock.mock.mockImplementation((pattern: string) => {
+        if (pattern === 'fixtures/**') return ['fixtures/accessible.html']
+        return []
+      })
+      readFileMock.mock.mockImplementation((path: string) => {
+        if (path === 'axe-linter.yml') throw new Error('ENOENT')
+        return ''
+      })
+      lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
 
       await run(mockCore)
 
       assert.strictEqual(
-        getChangedFilesStub.called,
-        false,
+        getChangedFilesMock.mock.callCount(),
+        0,
         'getChangedFiles should not be called when AXE_LINTER_ONLY is set'
       )
-      assert.deepEqual(lintFilesStub.getCall(0).args[0], [
+      assert.deepEqual(lintFilesMock.mock.calls[0].arguments[0], [
         'fixtures/accessible.html'
       ])
     })
 
     it('should lint only files even when glob resolves multiple', async () => {
       process.env.AXE_LINTER_ONLY = 'fixtures/**'
-      ;(mockCore.getInput as sinon.SinonStub)
-        .withArgs('github_token', { required: true })
-        .returns('test-token')
-      ;(mockCore.getInput as sinon.SinonStub)
-        .withArgs('api_key', { required: true })
-        .returns('test-api-key')
-      ;(mockCore.getInput as sinon.SinonStub)
-        .withArgs('axe_linter_url')
-        .returns('https://test-linter.com')
+      setupInputs({ axe_linter_url: 'https://test-linter.com' })
 
-      globSyncStub
-        .withArgs('fixtures/**')
-        .returns(['fixtures/accessible.html', 'fixtures/accessible.vue'])
-      readFileStub
-        .withArgs('axe-linter.yml', 'utf8')
-        .throws(new Error('ENOENT'))
-      lintFilesStub.resolves(0)
+      globSyncMock.mock.mockImplementation((pattern: string) => {
+        if (pattern === 'fixtures/**')
+          return ['fixtures/accessible.html', 'fixtures/accessible.vue']
+        return []
+      })
+      readFileMock.mock.mockImplementation((path: string) => {
+        if (path === 'axe-linter.yml') throw new Error('ENOENT')
+        return ''
+      })
+      lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
 
       await run(mockCore)
 
-      assert.strictEqual(getChangedFilesStub.called, false)
-      assert.deepEqual(lintFilesStub.getCall(0).args[0], [
+      assert.strictEqual(getChangedFilesMock.mock.callCount(), 0)
+      assert.deepEqual(lintFilesMock.mock.calls[0].arguments[0], [
         'fixtures/accessible.html',
         'fixtures/accessible.vue'
       ])
     })
 
     it('should fall back to getChangedFiles when env var is not set', async () => {
-      ;(mockCore.getInput as sinon.SinonStub)
-        .withArgs('github_token', { required: true })
-        .returns('test-token')
-      ;(mockCore.getInput as sinon.SinonStub)
-        .withArgs('api_key', { required: true })
-        .returns('test-api-key')
-      ;(mockCore.getInput as sinon.SinonStub)
-        .withArgs('axe_linter_url')
-        .returns('https://test-linter.com')
+      setupInputs({ axe_linter_url: 'https://test-linter.com' })
 
-      getChangedFilesStub.resolves(['test.js'])
-      readFileStub
-        .withArgs('axe-linter.yml', 'utf8')
-        .throws(new Error('ENOENT'))
-      lintFilesStub.resolves(0)
+      getChangedFilesMock.mock.mockImplementation(() =>
+        Promise.resolve(['test.js'])
+      )
+      readFileMock.mock.mockImplementation((path: string) => {
+        if (path === 'axe-linter.yml') throw new Error('ENOENT')
+        return ''
+      })
+      lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
 
       await run(mockCore)
 
-      assert.strictEqual(getChangedFilesStub.called, true)
-      assert.strictEqual(globSyncStub.called, false)
+      assert.ok(getChangedFilesMock.mock.callCount() > 0)
+      assert.strictEqual(globSyncMock.mock.callCount(), 0)
     })
 
     it('should handle multiple glob patterns separated by newlines', async () => {
       process.env.AXE_LINTER_ONLY = 'fixtures/*.html\nfixtures/*.vue'
-      ;(mockCore.getInput as sinon.SinonStub)
-        .withArgs('github_token', { required: true })
-        .returns('test-token')
-      ;(mockCore.getInput as sinon.SinonStub)
-        .withArgs('api_key', { required: true })
-        .returns('test-api-key')
-      ;(mockCore.getInput as sinon.SinonStub)
-        .withArgs('axe_linter_url')
-        .returns('https://test-linter.com')
+      setupInputs({ axe_linter_url: 'https://test-linter.com' })
 
-      globSyncStub
-        .withArgs('fixtures/*.html')
-        .returns(['fixtures/accessible.html', 'fixtures/accessible.htm'])
-      globSyncStub
-        .withArgs('fixtures/*.vue')
-        .returns(['fixtures/accessible.vue'])
-      readFileStub
-        .withArgs('axe-linter.yml', 'utf8')
-        .throws(new Error('ENOENT'))
-      lintFilesStub.resolves(0)
+      globSyncMock.mock.mockImplementation((pattern: string) => {
+        const results: Record<string, string[]> = {
+          'fixtures/*.html': [
+            'fixtures/accessible.html',
+            'fixtures/accessible.htm'
+          ],
+          'fixtures/*.vue': ['fixtures/accessible.vue']
+        }
+        return results[pattern] ?? []
+      })
+      readFileMock.mock.mockImplementation((path: string) => {
+        if (path === 'axe-linter.yml') throw new Error('ENOENT')
+        return ''
+      })
+      lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
 
       await run(mockCore)
 
-      assert.strictEqual(getChangedFilesStub.called, false)
-      assert.deepEqual(lintFilesStub.getCall(0).args[0], [
+      assert.strictEqual(getChangedFilesMock.mock.callCount(), 0)
+      assert.deepEqual(lintFilesMock.mock.calls[0].arguments[0], [
         'fixtures/accessible.html',
         'fixtures/accessible.htm',
         'fixtures/accessible.vue'
@@ -442,37 +379,31 @@ describe('run', () => {
 })
 
 describe('getOnlyFiles', () => {
-  let sandbox: sinon.SinonSandbox
-  let globSyncStub: sinon.SinonStub
+  let globSyncMock: any
 
   beforeEach(() => {
-    sandbox = sinon.createSandbox()
-    globSyncStub = sandbox.stub()
-    sandbox.replace(require('fs'), 'globSync', globSyncStub)
-    sandbox.replace(
-      require('fs'),
-      'statSync',
-      sandbox.stub().returns({ isFile: () => true })
-    )
+    globSyncMock = mock.method(require('fs'), 'globSync', () => [])
+    mock.method(require('fs'), 'statSync', () => ({ isFile: () => true }))
     delete process.env.AXE_LINTER_ONLY
   })
 
   afterEach(() => {
     delete process.env.AXE_LINTER_ONLY
-    sandbox.restore()
+    mock.restoreAll()
   })
 
   it('should return empty array when env var is not set', () => {
     const result = getOnlyFiles()
     assert.deepEqual(result, [])
-    assert.strictEqual(globSyncStub.called, false)
+    assert.strictEqual(globSyncMock.mock.callCount(), 0)
   })
 
   it('should resolve glob patterns from env var', () => {
     process.env.AXE_LINTER_ONLY = 'fixtures/**'
-    globSyncStub
-      .withArgs('fixtures/**')
-      .returns(['fixtures/a.html', 'fixtures/b.js'])
+    globSyncMock.mock.mockImplementation((pattern: string) => {
+      if (pattern === 'fixtures/**') return ['fixtures/a.html', 'fixtures/b.js']
+      return []
+    })
 
     const result = getOnlyFiles()
     assert.deepEqual(result, ['fixtures/a.html', 'fixtures/b.js'])
@@ -480,8 +411,13 @@ describe('getOnlyFiles', () => {
 
   it('should skip empty lines', () => {
     process.env.AXE_LINTER_ONLY = 'fixtures/*.html\n\nfixtures/*.js\n'
-    globSyncStub.withArgs('fixtures/*.html').returns(['fixtures/a.html'])
-    globSyncStub.withArgs('fixtures/*.js').returns(['fixtures/b.js'])
+    globSyncMock.mock.mockImplementation((pattern: string) => {
+      const results: Record<string, string[]> = {
+        'fixtures/*.html': ['fixtures/a.html'],
+        'fixtures/*.js': ['fixtures/b.js']
+      }
+      return results[pattern] ?? []
+    })
 
     const result = getOnlyFiles()
     assert.deepEqual(result, ['fixtures/a.html', 'fixtures/b.js'])
