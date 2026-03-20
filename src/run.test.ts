@@ -1,11 +1,8 @@
-import 'mocha'
 import assert from 'node:assert/strict'
-import * as sinon from 'sinon'
+import sinon from 'sinon'
+import esmock from 'esmock'
 import { stringify } from 'yaml'
-import run, { getOnlyFiles } from './run'
-import * as gitModule from './git'
-import * as linterModule from './linter'
-import { Core } from './types'
+import type { Core } from './types.ts'
 
 describe('run', () => {
   let sandbox: sinon.SinonSandbox
@@ -14,8 +11,9 @@ describe('run', () => {
   let globSyncStub: sinon.SinonStub
   let getChangedFilesStub: sinon.SinonStub
   let lintFilesStub: sinon.SinonStub
+  let run: typeof import('./run.ts').default
 
-  beforeEach(() => {
+  beforeEach(async () => {
     sandbox = sinon.createSandbox()
 
     // Create mock Core implementation
@@ -30,17 +28,21 @@ describe('run', () => {
     // Stub file system
     readFileStub = sandbox.stub()
     globSyncStub = sandbox.stub()
-    sandbox.replace(require('fs'), 'readFileSync', readFileStub)
-    sandbox.replace(require('fs'), 'globSync', globSyncStub)
-    sandbox.replace(
-      require('fs'),
-      'statSync',
-      sandbox.stub().returns({ isFile: () => true })
-    )
 
     // Stub git and linter functions
-    getChangedFilesStub = sandbox.stub(gitModule, 'getChangedFiles')
-    lintFilesStub = sandbox.stub(linterModule, 'lintFiles')
+    getChangedFilesStub = sandbox.stub()
+    lintFilesStub = sandbox.stub()
+
+    const runModule = await esmock('./run.ts', {
+      fs: {
+        readFileSync: readFileStub,
+        globSync: globSyncStub,
+        statSync: sandbox.stub().returns({ isFile: () => true })
+      },
+      './git.ts': { getChangedFiles: getChangedFilesStub },
+      './linter.ts': { lintFiles: lintFilesStub }
+    })
+    run = runModule.default
 
     // Clear env var by default
     delete process.env.AXE_LINTER_ONLY
@@ -444,16 +446,23 @@ describe('run', () => {
 describe('getOnlyFiles', () => {
   let sandbox: sinon.SinonSandbox
   let globSyncStub: sinon.SinonStub
+  let getOnlyFiles: typeof import('./run.ts').getOnlyFiles
 
-  beforeEach(() => {
+  beforeEach(async () => {
     sandbox = sinon.createSandbox()
     globSyncStub = sandbox.stub()
-    sandbox.replace(require('fs'), 'globSync', globSyncStub)
-    sandbox.replace(
-      require('fs'),
-      'statSync',
-      sandbox.stub().returns({ isFile: () => true })
-    )
+
+    const runModule = await esmock('./run.ts', {
+      fs: {
+        readFileSync: sandbox.stub(),
+        globSync: globSyncStub,
+        statSync: sandbox.stub().returns({ isFile: () => true })
+      },
+      './git.ts': { getChangedFiles: sandbox.stub() },
+      './linter.ts': { lintFiles: sandbox.stub() }
+    })
+    getOnlyFiles = runModule.getOnlyFiles
+
     delete process.env.AXE_LINTER_ONLY
   })
 

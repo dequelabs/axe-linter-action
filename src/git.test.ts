@@ -1,9 +1,6 @@
-import 'mocha'
 import assert from 'node:assert/strict'
 import sinon from 'sinon'
-import * as github from '@actions/github'
-import * as core from '@actions/core'
-import { getChangedFiles } from './git'
+import esmock from 'esmock'
 
 describe('git', () => {
   const token = 'test-token'
@@ -12,10 +9,11 @@ describe('git', () => {
   let mockContext: any
   let githubStub: sinon.SinonStub
   let debugStub: sinon.SinonStub
+  let getChangedFiles: typeof import('./git.ts').getChangedFiles
 
-  beforeEach(() => {
+  beforeEach(async () => {
     sandbox = sinon.createSandbox()
-    debugStub = sandbox.stub(core, 'debug')
+    debugStub = sandbox.stub()
 
     // Mock Octokit responses
     mockOctokit = {
@@ -39,8 +37,13 @@ describe('git', () => {
     }
 
     // Stub GitHub getOctokit
-    githubStub = sandbox.stub(github, 'getOctokit').returns(mockOctokit)
-    sandbox.stub(github, 'context').value(mockContext)
+    githubStub = sandbox.stub().returns(mockOctokit)
+
+    const gitModule = await esmock('./git.ts', {
+      '@actions/core': { debug: debugStub },
+      '@actions/github': { getOctokit: githubStub, context: mockContext }
+    })
+    getChangedFiles = gitModule.getChangedFiles
   })
 
   afterEach(() => {

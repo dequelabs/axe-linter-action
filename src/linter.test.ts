@@ -1,10 +1,8 @@
-import 'mocha'
 import assert from 'node:assert/strict'
-import * as sinon from 'sinon'
-import * as core from '@actions/core'
+import sinon from 'sinon'
+import esmock from 'esmock'
 import { MockAgent, setGlobalDispatcher, type Interceptable } from 'undici'
-import { lintFiles } from './linter'
-import type { LinterResponse } from './types'
+import type { LinterResponse } from './types.ts'
 
 type MockResponses = Record<string, LinterResponse>
 
@@ -13,6 +11,7 @@ describe('linter', () => {
   let errorStub: sinon.SinonStub
   let debugStub: sinon.SinonStub
   let readFileStub: sinon.SinonStub
+  let lintFiles: typeof import('./linter.ts').lintFiles
 
   describe('lintFiles', () => {
     const apiKey = 'test-api-key'
@@ -22,16 +21,27 @@ describe('linter', () => {
     let mockAgent: MockAgent
     let mockPool: Interceptable
 
-    beforeEach(() => {
+    beforeEach(async () => {
       sandbox = sinon.createSandbox()
 
       // Stub core functions
-      errorStub = sandbox.stub(core, 'error')
-      debugStub = sandbox.stub(core, 'debug')
+      errorStub = sandbox.stub()
+      debugStub = sandbox.stub()
 
       // Stub file system
       readFileStub = sandbox.stub()
-      sandbox.replace(require('fs'), 'readFileSync', readFileStub)
+
+      const linterModule = await esmock('./linter.ts', {
+        '@actions/core': {
+          error: errorStub,
+          debug: debugStub,
+          info: sandbox.stub(),
+          startGroup: sandbox.stub(),
+          endGroup: sandbox.stub()
+        },
+        fs: { readFileSync: readFileStub }
+      })
+      lintFiles = linterModule.lintFiles
 
       // Enable mock agent
       mockAgent = new MockAgent()

@@ -20,7 +20,7 @@ module.exports = [
     }
   },
   {
-    files: ['eslint.config.js'],
+    files: ['eslint.config.cjs'],
     rules: {
       '@typescript-eslint/no-var-requires': 'off',
       '@typescript-eslint/no-require-imports': 'off'
