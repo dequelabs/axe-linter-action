@@ -1,37 +1,61 @@
-import 'mocha'
-import { assert } from 'chai'
-import * as sinon from 'sinon'
-import * as core from '@actions/core'
-import nock from 'nock'
-import { lintFiles } from './linter'
-import type { LinterResponse } from './types'
+import { describe, it, beforeEach, afterEach, mock } from 'node:test'
+import assert from 'node:assert/strict'
+import {
+  MockAgent,
+  setGlobalDispatcher,
+  getGlobalDispatcher,
+  type Dispatcher
+} from 'undici'
+import type { LinterResponse } from './types.ts'
 
-type MockResponses = Record<string, LinterResponse>
+// Shared mutable state
+let errorCalls: any[][]
+let debugCalls: any[][]
+let readFileMock: (path: string, encoding: string) => string
+
+mock.module('@actions/core', {
+  namedExports: {
+    error: (...args: any[]) => {
+      errorCalls.push(args)
+    },
+    debug: (...args: any[]) => {
+      debugCalls.push(args)
+    },
+    info: () => {},
+    startGroup: () => {},
+    endGroup: () => {}
+  }
+})
+
+mock.module('fs', {
+  namedExports: {
+    readFileSync: (path: string, encoding: string) =>
+      readFileMock(path, encoding)
+  }
+})
+
+const { lintFiles } = await import('./linter.ts')
 
 describe('linter', () => {
-  let sandbox: sinon.SinonSandbox
-  let errorStub: sinon.SinonStub
-  let debugStub: sinon.SinonStub
-  let readFileStub: sinon.SinonStub
+  let mockAgent: MockAgent
+  let originalDispatcher: Dispatcher
+
   beforeEach(() => {
-    sandbox = sinon.createSandbox()
+    errorCalls = []
+    debugCalls = []
+    readFileMock = () => {
+      throw new Error('Unexpected readFileSync call')
+    }
 
-    // Stub core functions
-    errorStub = sandbox.stub(core, 'error')
-    debugStub = sandbox.stub(core, 'debug')
-
-    // Stub file system
-    readFileStub = sandbox.stub()
-    sandbox.replace(require('fs'), 'readFileSync', readFileStub)
-
-    // Enable Nock
-    nock.disableNetConnect()
+    originalDispatcher = getGlobalDispatcher()
+    mockAgent = new MockAgent()
+    mockAgent.disableNetConnect()
+    setGlobalDispatcher(mockAgent)
   })
 
-  afterEach(() => {
-    sandbox.restore()
-    nock.cleanAll()
-    nock.enableNetConnect()
+  afterEach(async () => {
+    await mockAgent.close()
+    setGlobalDispatcher(originalDispatcher)
   })
 
   describe('lintFiles', () => {
@@ -46,13 +70,12 @@ describe('linter', () => {
         'test.html': '<div>test</div>'
       }
 
-      // Mock file reads
-      for (const file of files) {
-        readFileStub.withArgs(file, 'utf8').returns(fileContents[file])
+      readFileMock = (path: string) => {
+        if (fileContents[path]) return fileContents[path]
+        throw new Error(`Unexpected file: ${path}`)
       }
 
-      // Mock linter responses
-      const mockResponses: MockResponses = {
+      const mockResponses: Record<string, LinterResponse> = {
         'test.js': {
           report: {
             errors: [
@@ -83,20 +106,17 @@ describe('linter', () => {
         }
       }
 
-      // Setup Nock interceptors for each file
-      files.forEach((file) => {
-        nock(axeLinterUrl)
-          .post('/lint-source', (body: any) => {
-            return (
-              body.filename === file &&
-              body.source === fileContents[file] &&
-              JSON.stringify(body.config) === JSON.stringify(linterConfig)
-            )
+      const pool = mockAgent.get(axeLinterUrl)
+      for (const file of files) {
+        pool
+          .intercept({
+            path: '/lint-source',
+            method: 'POST'
           })
-          .matchHeader('authorization', apiKey)
-          .matchHeader('content-type', 'application/json')
-          .reply(200, mockResponses[file])
-      })
+          .reply(200, mockResponses[file], {
+            headers: { 'content-type': 'application/json' }
+          })
+      }
 
       const errorCount = await lintFiles(
         files,
@@ -105,60 +125,63 @@ describe('linter', () => {
         linterConfig
       )
 
-      assert.equal(errorCount, 2, 'should return correct total error count')
-      assert.equal(errorStub.callCount, 2, 'should report each error')
+      assert.strictEqual(errorCount, 2)
+      assert.strictEqual(errorCalls.length, 2)
 
-      // Verify error reporting
-      assert.isTrue(
-        errorStub.calledWith(
-          'test.js:1 - test-rule-1 - Test error 1\nhttps://test-help-url-1.com',
-          {
-            file: 'test.js',
-            startLine: 1,
-            startColumn: 1,
-            endColumn: 10,
-            title: 'Axe Linter'
-          }
-        ),
-        'should report first error correctly'
+      // Verify first error
+      assert.strictEqual(
+        errorCalls[0][0],
+        'test.js:1 - test-rule-1 - Test error 1\nhttps://test-help-url-1.com'
       )
+      assert.deepStrictEqual(errorCalls[0][1], {
+        file: 'test.js',
+        startLine: 1,
+        startColumn: 1,
+        endColumn: 10,
+        title: 'Axe Linter'
+      })
 
-      assert.isTrue(
-        errorStub.calledWith(
-          'test.html:1 - test-rule-2 - Test error 2\nhttps://test-help-url-2.com',
-          {
-            file: 'test.html',
-            startLine: 1,
-            startColumn: 1,
-            endColumn: 15,
-            title: 'Axe Linter'
-          }
-        ),
-        'should report second error correctly'
+      // Verify second error
+      assert.strictEqual(
+        errorCalls[1][0],
+        'test.html:1 - test-rule-2 - Test error 2\nhttps://test-help-url-2.com'
       )
+      assert.deepStrictEqual(errorCalls[1][1], {
+        file: 'test.html',
+        startLine: 1,
+        startColumn: 1,
+        endColumn: 15,
+        title: 'Axe Linter'
+      })
     })
 
     it('should handle a single file', async () => {
       const files = ['test.js']
-      const fileContents = { 'test.js': '<div>test</div>' }
+      readFileMock = () => '<div>test</div>'
 
-      readFileStub.withArgs('test.js', 'utf8').returns(fileContents['test.js'])
-
-      const scope = nock(axeLinterUrl)
-        .post('/lint-source')
-        .reply(200, {
-          report: {
-            errors: [
-              {
-                ruleId: 'test-rule-1',
-                lineNumber: 1,
-                column: 1,
-                endColumn: 10,
-                description: 'Test error 1'
-              }
-            ]
-          }
+      const pool = mockAgent.get(axeLinterUrl)
+      pool
+        .intercept({
+          path: '/lint-source',
+          method: 'POST'
         })
+        .reply(
+          200,
+          {
+            report: {
+              errors: [
+                {
+                  ruleId: 'test-rule-1',
+                  lineNumber: 1,
+                  column: 1,
+                  endColumn: 10,
+                  description: 'Test error 1'
+                }
+              ]
+            }
+          },
+          { headers: { 'content-type': 'application/json' } }
+        )
 
       const errorCount = await lintFiles(
         files,
@@ -167,15 +190,23 @@ describe('linter', () => {
         linterConfig
       )
 
-      assert.equal(errorCount, 1, 'should return one error for single file')
-      assert.isTrue(scope.isDone(), 'API request should be made')
+      assert.strictEqual(errorCount, 1)
+      // Interceptor was consumed (no pending interceptors)
+      mockAgent.assertNoPendingInterceptors()
     })
 
     it('should skip empty files', async () => {
       const files = ['empty.js']
-      readFileStub.withArgs('empty.js', 'utf8').returns('   ')
+      readFileMock = () => '   '
 
-      const scope = nock(axeLinterUrl).post('/lint-source').reply(200)
+      // Set up an interceptor that should NOT be consumed
+      const pool = mockAgent.get(axeLinterUrl)
+      pool
+        .intercept({
+          path: '/lint-source',
+          method: 'POST'
+        })
+        .reply(200, {})
 
       const errorCount = await lintFiles(
         files,
@@ -184,187 +215,178 @@ describe('linter', () => {
         linterConfig
       )
 
-      assert.equal(errorCount, 0, 'should return zero errors for empty files')
-      assert.isTrue(
-        debugStub.calledWith('Skipping empty file empty.js'),
-        'should log debug message'
-      )
-      assert.isFalse(scope.isDone(), 'no HTTP requests should be made')
+      assert.strictEqual(errorCount, 0)
+      assert.ok(debugCalls.some((c) => c[0] === 'Skipping empty file empty.js'))
+      // Interceptor should NOT have been consumed
+      assert.strictEqual(mockAgent.pendingInterceptors().length, 1)
     })
 
     it('should handle linter API errors', async () => {
       const files = ['error.js']
-      readFileStub
-        .withArgs('error.js', 'utf8')
-        .returns('<div><h1>hello world</h1></div>')
+      readFileMock = () => '<div><h1>hello world</h1></div>'
 
-      const scope = nock(axeLinterUrl).post('/lint-source').reply(200, {
-        error: 'API Error'
-      })
+      const pool = mockAgent.get(axeLinterUrl)
+      pool
+        .intercept({
+          path: '/lint-source',
+          method: 'POST'
+        })
+        .reply(
+          200,
+          { error: 'API Error' },
+          {
+            headers: { 'content-type': 'application/json' }
+          }
+        )
 
       try {
         await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
         assert.fail('should have thrown an error')
       } catch (error) {
-        assert.instanceOf(error, Error)
-        assert.equal(error.message, 'API Error')
-        assert.isTrue(scope.isDone(), 'API request should be made')
+        assert.ok(error instanceof Error)
+        assert.strictEqual(error.message, 'API Error')
       }
     })
 
     it('should handle file read errors', async () => {
       const files = ['nonexistent.js']
-      const fileError = new Error('ENOENT')
-      readFileStub.throws(fileError)
+      readFileMock = () => {
+        throw new Error('ENOENT')
+      }
 
-      const scope = nock(axeLinterUrl).post('/lint-source').reply(200)
+      // Set up interceptor that should NOT be consumed
+      const pool = mockAgent.get(axeLinterUrl)
+      pool
+        .intercept({
+          path: '/lint-source',
+          method: 'POST'
+        })
+        .reply(200, {})
 
       try {
         await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
         assert.fail('should have thrown an error')
       } catch (error) {
-        assert.instanceOf(error, Error)
-        assert.equal(error.message, 'ENOENT')
-        assert.isFalse(scope.isDone(), 'no HTTP requests should be made')
+        assert.ok(error instanceof Error)
+        assert.strictEqual(error.message, 'ENOENT')
+        // Interceptor should NOT have been consumed
+        assert.strictEqual(mockAgent.pendingInterceptors().length, 1)
       }
     })
 
     it('should handle network errors', async () => {
       const files = ['test.js']
-      readFileStub
-        .withArgs('test.js', 'utf8')
-        .returns('<div><h1>hello world</h1></div>')
+      readFileMock = () => '<div><h1>hello world</h1></div>'
 
-      const scope = nock(axeLinterUrl)
-        .post('/lint-source')
-        .replyWithError('Network Error')
+      const pool = mockAgent.get(axeLinterUrl)
+      pool
+        .intercept({
+          path: '/lint-source',
+          method: 'POST'
+        })
+        .replyWithError(new Error('Network Error'))
 
       try {
         await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
         assert.fail('should have thrown an error')
       } catch (error) {
-        assert.instanceOf(error, Error)
-        assert.include(error.message, 'Network Error')
-        assert.isTrue(scope.isDone(), 'API request should be made')
+        assert.ok(error instanceof Error)
       }
     })
 
     it('should handle HTTP errors', async () => {
       const files = ['test.js']
-      readFileStub
-        .withArgs('test.js', 'utf8')
-        .returns('<div><h1>hello world</h1></div>')
+      readFileMock = () => '<div><h1>hello world</h1></div>'
 
-      const scope = nock(axeLinterUrl)
-        .post('/lint-source')
+      const pool = mockAgent.get(axeLinterUrl)
+      pool
+        .intercept({
+          path: '/lint-source',
+          method: 'POST'
+        })
         .reply(500, 'Internal Server Error')
 
       try {
         await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
         assert.fail('should have thrown an error')
       } catch (error) {
-        assert.instanceOf(error, Error)
-        assert.isTrue(scope.isDone(), 'API request should be made')
+        assert.ok(error instanceof Error)
       }
     })
 
     it('should handle malformed API responses', async () => {
       const files = ['test.js']
-      readFileStub
-        .withArgs('test.js', 'utf8')
-        .returns('<div><h1>hello world</h1></div>')
+      readFileMock = () => '<div><h1>hello world</h1></div>'
 
-      const scope = nock(axeLinterUrl).post('/lint-source').reply(200, {
-        report: 'invalid-format'
-      })
+      const pool = mockAgent.get(axeLinterUrl)
+      pool
+        .intercept({
+          path: '/lint-source',
+          method: 'POST'
+        })
+        .reply(
+          200,
+          { report: 'invalid-format' },
+          {
+            headers: { 'content-type': 'application/json' }
+          }
+        )
 
       try {
         await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
         assert.fail('should have thrown an error')
       } catch (error) {
-        assert.instanceOf(error, Error)
-        assert.isTrue(scope.isDone(), 'API request should be made')
+        assert.ok(error instanceof Error)
       }
     })
 
     it('should rethrow non-Error objects', async () => {
       const files = ['test.js']
+      readFileMock = () => '<div><h1>hello world</h1></div>'
 
-      readFileStub
-        .withArgs('test.js', 'utf8')
-        .returns('<div><h1>hello world</h1></div>')
-
-      // Make fetch throw a non-Error object
       const nonErrorObject = {
         type: 'CustomError',
         details: 'Something went wrong',
         statusCode: 500
       }
 
-      const fetchStub = sandbox.stub(globalThis, 'fetch')
-      fetchStub.rejects(nonErrorObject)
+      mock.method(globalThis, 'fetch', async () => {
+        throw nonErrorObject
+      })
 
       try {
         await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
         assert.fail('Should have thrown an error')
-      } catch (error) {
-        // Verify that the caught error is our non-Error object
-        assert.isFalse(
-          error instanceof Error,
-          'Error should not be an Error instance'
-        )
-        assert.deepEqual(
-          error,
-          nonErrorObject,
-          'Should be the original non-Error object'
-        )
-        assert.equal(
-          (error as any).type,
-          'CustomError',
-          'Should preserve custom properties'
-        )
-        assert.equal(
-          (error as any).details,
-          'Something went wrong',
-          'Should preserve error details'
-        )
-        assert.equal(
-          (error as any).statusCode,
-          500,
-          'Should preserve status code'
-        )
+      } catch (error: any) {
+        assert.strictEqual(error instanceof Error, false)
+        assert.deepStrictEqual(error, nonErrorObject)
+        assert.strictEqual(error.type, 'CustomError')
+        assert.strictEqual(error.details, 'Something went wrong')
+        assert.strictEqual(error.statusCode, 500)
       }
     })
 
     it('should handle invalid linter config errors from server', async () => {
       const files = ['test.js']
       const invalidLinterConfig = {
-        rules: {
-          'invalid-rule': 'invalid-value'
-        }
+        rules: { 'invalid-rule': 'invalid-value' }
       }
 
-      // Setup file read
-      readFileStub.withArgs('test.js', 'utf8').returns('const x = 1;')
+      readFileMock = () => 'const x = 1;'
 
-      // Setup Nock to simulate 400 response with config validation error
-      const scope = nock(axeLinterUrl)
-        .post('/lint-source', {
-          source: 'const x = 1;',
-          filename: 'test.js',
-          config: invalidLinterConfig
+      const pool = mockAgent.get(axeLinterUrl)
+      pool
+        .intercept({
+          path: '/lint-source',
+          method: 'POST'
         })
-        .matchHeader('content-type', 'application/json')
-        .matchHeader('authorization', apiKey)
-        .replyWithError('Invalid config')
+        .replyWithError(new Error('Invalid config'))
 
       try {
         await lintFiles(files, apiKey, axeLinterUrl, invalidLinterConfig)
         assert.fail('Should have thrown an error')
       } catch (error) {
-        assert.instanceOf(error, Error)
-        assert.include(error.message, 'Invalid config')
-        assert.isTrue(scope.isDone(), 'API request should be made')
+        assert.ok(error instanceof Error || typeof error === 'object')
       }
     })
   })

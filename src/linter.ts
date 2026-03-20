@@ -1,7 +1,7 @@
 import * as core from '@actions/core'
 import { readFileSync } from 'fs'
-import type { LinterResponse } from './types'
-import { pluralize } from './utils'
+import type { LinterResponse } from './types.ts'
+import { pluralize } from './utils.ts'
 
 export async function lintFiles(
   files: string[],

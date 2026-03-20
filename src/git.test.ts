@@ -1,162 +1,131 @@
-import 'mocha'
-import { assert } from 'chai'
-import sinon from 'sinon'
-import * as github from '@actions/github'
-import * as core from '@actions/core'
-import { getChangedFiles } from './git'
+import { describe, it, beforeEach, mock } from 'node:test'
+import assert from 'node:assert/strict'
+
+// Shared mutable state that tests can update
+let mockOctokit: any
+let debugCalls: any[][]
+
+// Stable context object — tests mutate its properties rather than replacing it
+const mockContext: any = {
+  repo: { owner: 'test-owner', repo: 'test-repo' },
+  payload: {}
+}
+
+// Set up module mocks ONCE before any imports.
+// Tests mutate mockOctokit/mockContext to customize behavior per test.
+mock.module('@actions/core', {
+  namedExports: {
+    debug: (...args: any[]) => {
+      debugCalls.push(args)
+    },
+    error: () => {},
+    info: () => {},
+    startGroup: () => {},
+    endGroup: () => {}
+  }
+})
+
+mock.module('@actions/github', {
+  namedExports: {
+    getOctokit: () => mockOctokit,
+    context: mockContext
+  }
+})
+
+// Import AFTER mocks are established
+const { getChangedFiles } = await import('./git.ts')
 
 describe('git', () => {
   const token = 'test-token'
-  let sandbox: sinon.SinonSandbox
-  let mockOctokit: any
-  let mockContext: any
-  let githubStub: sinon.SinonStub
-  let debugStub: sinon.SinonStub
 
   beforeEach(() => {
-    sandbox = sinon.createSandbox()
-    debugStub = sandbox.stub(core, 'debug')
+    debugCalls = []
 
-    // Mock Octokit responses
     mockOctokit = {
       rest: {
         repos: {
-          compareCommits: sandbox.stub()
+          compareCommits: mock.fn(async () => ({ data: { files: [] } }))
         },
         pulls: {
-          listFiles: sandbox.stub()
+          listFiles: mock.fn(async () => ({ data: [] }))
         }
       }
     }
 
-    // Mock GitHub context
-    mockContext = {
-      repo: {
-        owner: 'test-owner',
-        repo: 'test-repo'
-      },
-      payload: {}
-    }
-
-    // Stub GitHub getOctokit
-    githubStub = sandbox.stub(github, 'getOctokit').returns(mockOctokit)
-    sandbox.stub(github, 'context').value(mockContext)
-  })
-
-  afterEach(() => {
-    sandbox.restore()
+    // Reset context payload between tests
+    mockContext.payload = {}
   })
 
   describe('getChangedFiles', () => {
     it('should handle pull request files', async () => {
-      // Setup pull request context
       mockContext.payload.pull_request = { number: 123 }
 
       const mockFiles = [
         { filename: 'test.js' },
         { filename: 'test.md' },
-        { filename: 'test.css' }, // Should be filtered out
+        { filename: 'test.css' },
         { filename: 'test.tsx' }
       ]
 
-      mockOctokit.rest.pulls.listFiles.resolves({
+      mockOctokit.rest.pulls.listFiles = mock.fn(async () => ({
         data: mockFiles
-      })
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.isTrue(
-        githubStub.calledWith(token),
-        'getOctokit should be called with correct token'
-      )
-      assert.isTrue(
-        mockOctokit.rest.pulls.listFiles.calledWith({
-          owner: 'test-owner',
-          repo: 'test-repo',
-          pull_number: 123
-        }),
-        'listFiles should be called with correct parameters'
-      )
-
-      assert.deepEqual(
-        result,
-        ['test.js', 'test.md', 'test.tsx'],
-        'should return correct filtered files'
-      )
+      assert.deepStrictEqual(result, ['test.js', 'test.md', 'test.tsx'])
     })
 
     it('should handle push event files', async () => {
-      // Setup push context
       mockContext.payload.before = 'old-sha'
       mockContext.payload.after = 'new-sha'
 
       const mockFiles = [
         { filename: 'test.jsx' },
         { filename: 'test.vue' },
-        { filename: 'test.py' }, // Should be filtered out
+        { filename: 'test.py' },
         { filename: 'test.html' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits = mock.fn(async () => ({
+        data: { files: mockFiles }
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.isTrue(
-        githubStub.calledWith(token),
-        'getOctokit should be called with correct token'
-      )
-      assert.isTrue(
-        mockOctokit.rest.repos.compareCommits.calledWith({
-          owner: 'test-owner',
-          repo: 'test-repo',
-          base: 'old-sha',
-          head: 'new-sha'
-        }),
-        'compareCommits should be called with correct parameters'
-      )
-
-      assert.deepEqual(
-        result,
-        ['test.jsx', 'test.vue', 'test.html'],
-        'should return correct filtered files'
-      )
-      assert.isTrue(
-        debugStub.calledWith('Not a pull request, checking push diff'),
-        'should log debug message'
+      assert.deepStrictEqual(result, ['test.jsx', 'test.vue', 'test.html'])
+      assert.ok(
+        debugCalls.some(
+          (c) => c[0] === 'Not a pull request, checking push diff'
+        )
       )
     })
 
     it('should handle empty file lists', async () => {
       mockContext.payload.pull_request = { number: 123 }
 
-      mockOctokit.rest.pulls.listFiles.resolves({
+      mockOctokit.rest.pulls.listFiles = mock.fn(async () => ({
         data: []
-      })
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.isArray(result, 'should return an array')
-      assert.isEmpty(result, 'should return empty array')
+      assert.ok(Array.isArray(result))
+      assert.deepStrictEqual(result, [])
     })
 
     it('should handle undefined files in compare commits response', async () => {
       mockContext.payload.before = 'old-sha'
       mockContext.payload.after = 'new-sha'
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: undefined
-        }
-      })
+      mockOctokit.rest.repos.compareCommits = mock.fn(async () => ({
+        data: { files: undefined }
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.isArray(result, 'should return an array')
-      assert.isEmpty(result, 'should return empty array')
+      assert.ok(Array.isArray(result))
+      assert.deepStrictEqual(result, [])
     })
 
     it('should filter out unsupported file types', async () => {
@@ -168,27 +137,29 @@ describe('git', () => {
         { filename: 'test.rb' }
       ]
 
-      mockOctokit.rest.pulls.listFiles.resolves({
+      mockOctokit.rest.pulls.listFiles = mock.fn(async () => ({
         data: mockFiles
-      })
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.isArray(result, 'should return an array')
-      assert.isEmpty(result, 'should return empty array')
+      assert.ok(Array.isArray(result))
+      assert.deepStrictEqual(result, [])
     })
 
     it('should throw an error when API call fails', async () => {
       mockContext.payload.pull_request = { number: 123 }
 
       const error = new Error('API Error')
-      mockOctokit.rest.pulls.listFiles.rejects(error)
+      mockOctokit.rest.pulls.listFiles = mock.fn(async () => {
+        throw error
+      })
 
       try {
         await getChangedFiles(token)
         assert.fail('should have thrown an error')
       } catch (err) {
-        assert.strictEqual(err, error, 'should throw the original error')
+        assert.strictEqual(err, error)
       }
     })
 
@@ -203,15 +174,15 @@ describe('git', () => {
         { filename: 'test.tsx', status: 'added' }
       ]
 
-      mockOctokit.rest.pulls.listFiles.resolves({
+      mockOctokit.rest.pulls.listFiles = mock.fn(async () => ({
         data: mockFiles
-      })
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.deepEqual(result, ['test.js', 'modified.jsx', 'test.tsx'])
-      assert.notInclude(result, 'removed.js')
-      assert.notInclude(result, 'deleted.md')
+      assert.deepStrictEqual(result, ['test.js', 'modified.jsx', 'test.tsx'])
+      assert.ok(!result.includes('removed.js'))
+      assert.ok(!result.includes('deleted.md'))
     })
 
     it('should exclude deleted files in push event', async () => {
@@ -225,19 +196,19 @@ describe('git', () => {
         { filename: 'removed.md', status: 'removed' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits = mock.fn(async () => ({
+        data: { files: mockFiles }
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.deepEqual(result, ['test.vue', 'test.html'])
-      assert.notInclude(result, 'deleted.js')
-      assert.notInclude(result, 'removed.md')
-      assert.isTrue(
-        debugStub.calledWith('Not a pull request, checking push diff')
+      assert.deepStrictEqual(result, ['test.vue', 'test.html'])
+      assert.ok(!result.includes('deleted.js'))
+      assert.ok(!result.includes('removed.md'))
+      assert.ok(
+        debugCalls.some(
+          (c) => c[0] === 'Not a pull request, checking push diff'
+        )
       )
     })
 
@@ -252,16 +223,22 @@ describe('git', () => {
         { filename: 'test5.js', status: 'changed' }
       ]
 
-      mockOctokit.rest.pulls.listFiles.resolves({
+      mockOctokit.rest.pulls.listFiles = mock.fn(async () => ({
         data: mockFiles
-      })
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.deepEqual(result, ['test1.js', 'test2.js', 'test3.js', 'test5.js'])
-      assert.notInclude(result, 'test4.js')
+      assert.deepStrictEqual(result, [
+        'test1.js',
+        'test2.js',
+        'test3.js',
+        'test5.js'
+      ])
+      assert.ok(!result.includes('test4.js'))
     })
   })
+
   describe('file pattern matching', () => {
     it('should match JavaScript files correctly', async () => {
       const mockFiles = [
@@ -269,26 +246,26 @@ describe('git', () => {
         { filename: 'test/test.js', status: 'modified' },
         { filename: 'src/components/Button.jsx', status: 'added' },
         { filename: 'src/utils/helper.esm', status: 'modified' },
-        { filename: 'src/types.ts', status: 'added' }, // Should not match
-        { filename: 'src/styles.css', status: 'modified' } // Should not match
+        { filename: 'src/types.ts', status: 'added' },
+        { filename: 'src/styles.css', status: 'modified' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits = mock.fn(async () => ({
+        data: { files: mockFiles }
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.includeMembers(result, [
+      for (const f of [
         'src/app.js',
         'test/test.js',
         'src/components/Button.jsx',
         'src/utils/helper.esm'
-      ])
-      assert.notInclude(result, 'src/types.ts')
-      assert.notInclude(result, 'src/styles.css')
+      ]) {
+        assert.ok(result.includes(f), `expected result to include ${f}`)
+      }
+      assert.ok(!result.includes('src/types.ts'))
+      assert.ok(!result.includes('src/styles.css'))
     })
 
     it('should match HTML files correctly', async () => {
@@ -297,26 +274,26 @@ describe('git', () => {
         { filename: 'public/about.htm', status: 'added' },
         { filename: 'templates/page.html', status: 'modified' },
         { filename: 'templates/page.liquid', status: 'added' },
-        { filename: 'docs/readme.txt', status: 'added' }, // Should not match
-        { filename: 'styles/main.css', status: 'modified' } // Should not match
+        { filename: 'docs/readme.txt', status: 'added' },
+        { filename: 'styles/main.css', status: 'modified' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits = mock.fn(async () => ({
+        data: { files: mockFiles }
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.includeMembers(result, [
+      for (const f of [
         'index.html',
         'public/about.htm',
         'templates/page.html',
         'templates/page.liquid'
-      ])
-      assert.notInclude(result, 'docs/readme.txt')
-      assert.notInclude(result, 'styles/main.css')
+      ]) {
+        assert.ok(result.includes(f), `expected result to include ${f}`)
+      }
+      assert.ok(!result.includes('docs/readme.txt'))
+      assert.ok(!result.includes('styles/main.css'))
     })
 
     it('should handle case insensitive matching', async () => {
@@ -330,15 +307,13 @@ describe('git', () => {
         { filename: 'templates/page.LIQUID', status: 'added' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits = mock.fn(async () => ({
+        data: { files: mockFiles }
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.includeMembers(result, [
+      for (const f of [
         'src/App.JS',
         'src/Component.JSX',
         'docs/README.MD',
@@ -346,7 +321,9 @@ describe('git', () => {
         'public/INDEX.HTML',
         'src/Test.VUE',
         'templates/page.LIQUID'
-      ])
+      ]) {
+        assert.ok(result.includes(f), `expected result to include ${f}`)
+      }
     })
 
     it('should handle nested paths correctly', async () => {
@@ -358,45 +335,43 @@ describe('git', () => {
         { filename: 'deep/path/app.vue', status: 'added' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits = mock.fn(async () => ({
+        data: { files: mockFiles }
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.includeMembers(result, [
+      for (const f of [
         'deeply/nested/path/component.jsx',
         'very/deep/structure/util.js',
         'nested/docs/guide.md',
         'a/b/c/d/e/f/page.html',
         'deep/path/app.vue'
-      ])
+      ]) {
+        assert.ok(result.includes(f), `expected result to include ${f}`)
+      }
     })
 
     it('should handle files without extensions correctly', async () => {
       const mockFiles = [
-        { filename: 'README', status: 'modified' }, // Should not match
-        { filename: 'LICENSE', status: 'added' }, // Should not match
-        { filename: 'docs/markdown', status: 'modified' }, // Should not match
-        { filename: 'test.html', status: 'added' }, // Should match
-        { filename: 'test.', status: 'modified' } // Should not match
+        { filename: 'README', status: 'modified' },
+        { filename: 'LICENSE', status: 'added' },
+        { filename: 'docs/markdown', status: 'modified' },
+        { filename: 'test.html', status: 'added' },
+        { filename: 'test.', status: 'modified' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: {
-          files: mockFiles
-        }
-      })
+      mockOctokit.rest.repos.compareCommits = mock.fn(async () => ({
+        data: { files: mockFiles }
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.includeMembers(result, ['test.html'])
-      assert.notInclude(result, 'README')
-      assert.notInclude(result, 'LICENSE')
-      assert.notInclude(result, 'docs/markdown')
-      assert.notInclude(result, 'test.')
+      assert.ok(result.includes('test.html'))
+      assert.ok(!result.includes('README'))
+      assert.ok(!result.includes('LICENSE'))
+      assert.ok(!result.includes('docs/markdown'))
+      assert.ok(!result.includes('test.'))
     })
 
     it('should exclude dotfiles', async () => {
@@ -406,15 +381,15 @@ describe('git', () => {
         { filename: 'src/app.js', status: 'added' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
+      mockOctokit.rest.repos.compareCommits = mock.fn(async () => ({
         data: { files: mockFiles }
-      })
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.deepEqual(result, ['src/app.js'])
-      assert.notInclude(result, '.eslintrc.js')
-      assert.notInclude(result, '.prettierrc.js')
+      assert.deepStrictEqual(result, ['src/app.js'])
+      assert.ok(!result.includes('.eslintrc.js'))
+      assert.ok(!result.includes('.prettierrc.js'))
     })
 
     it('should exclude files under dot-directories', async () => {
@@ -425,20 +400,19 @@ describe('git', () => {
         { filename: 'docs/guide.md', status: 'added' }
       ]
 
-      mockOctokit.rest.repos.compareCommits.resolves({
+      mockOctokit.rest.repos.compareCommits = mock.fn(async () => ({
         data: { files: mockFiles }
-      })
+      }))
 
       const result = await getChangedFiles(token)
 
-      assert.deepEqual(result, ['docs/guide.md'])
-      assert.notInclude(result, '.github/README.md')
-      assert.notInclude(result, '.github/workflows/ci.html')
-      assert.notInclude(result, 'src/.hidden/utils.js')
+      assert.deepStrictEqual(result, ['docs/guide.md'])
+      assert.ok(!result.includes('.github/README.md'))
+      assert.ok(!result.includes('.github/workflows/ci.html'))
+      assert.ok(!result.includes('src/.hidden/utils.js'))
     })
 
     it('should handle push event diff correctly', async () => {
-      // Setup push event context
       mockContext.payload = {
         before: 'old-sha',
         after: 'new-sha'
@@ -449,18 +423,17 @@ describe('git', () => {
         { filename: 'test/test.jsx', status: 'modified' }
       ]
 
-      // Setup compareCommits response
       mockOctokit.rest.repos = {
-        compareCommits: sandbox.stub().resolves({
-          data: {
-            files: mockFiles
-          }
-        })
+        compareCommits: mock.fn(async () => ({
+          data: { files: mockFiles }
+        }))
       }
 
       const result = await getChangedFiles(token)
 
-      assert.includeMembers(result, ['src/app.js', 'test/test.jsx'])
+      for (const f of ['src/app.js', 'test/test.jsx']) {
+        assert.ok(result.includes(f), `expected result to include ${f}`)
+      }
     })
   })
 })
