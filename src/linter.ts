@@ -31,6 +31,21 @@ export async function lintFiles(
         filename: file,
         config: linterConfig
       })
+    }).catch((error) => {
+      core.startGroup('Linter API Request Failed')
+      core.info(
+        JSON.stringify(
+          {
+            url: `${axeLinterUrl}/lint-source`,
+            filename: file,
+            config: linterConfig
+          },
+          null,
+          2
+        )
+      )
+      core.endGroup()
+      throw error
     })
 
     if (!response.ok) {
