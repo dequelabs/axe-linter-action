@@ -37,8 +37,11 @@ export async function lintFiles(
         JSON.stringify(
           {
             url: `${axeLinterUrl}/lint-source`,
-            filename: file,
-            config: linterConfig
+            body: {
+              source: fileContents,
+              filename: file,
+              config: linterConfig
+            }
           },
           null,
           2
