@@ -1,5 +1,5 @@
 import 'mocha'
-import { assert } from 'chai'
+import assert from 'node:assert/strict'
 import { pluralize } from './utils'
 
 describe('pluralize', () => {
