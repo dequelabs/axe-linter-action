@@ -1,4 +1,4 @@
-import 'mocha'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import * as sinon from 'sinon'
 import { stringify } from 'yaml'
