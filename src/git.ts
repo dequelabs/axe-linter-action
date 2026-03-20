@@ -1,19 +1,19 @@
 import * as github from '@actions/github'
 import * as core from '@actions/core'
-import { minimatch } from 'minimatch'
+import { extname } from 'path'
 
-const FILE_PATTERNS = [
-  '**/*.js',
-  '**/*.jsx',
-  '**/*.tsx',
-  '**/*.esm',
-  '**/*.html',
-  '**/*.htm',
-  '**/*.vue',
-  '**/*.md',
-  '**/*.markdown',
-  '**/*.liquid'
-] as const
+const FILE_EXTENSIONS = new Set([
+  '.js',
+  '.jsx',
+  '.tsx',
+  '.esm',
+  '.html',
+  '.htm',
+  '.vue',
+  '.md',
+  '.markdown',
+  '.liquid'
+])
 
 export async function getChangedFiles(token: string): Promise<string[]> {
   const octokit = github.getOctokit(token)
@@ -36,9 +36,7 @@ export async function getChangedFiles(token: string): Promise<string[]> {
         ?.filter(
           (file) =>
             file.status !== 'removed' &&
-            FILE_PATTERNS.some((pattern) =>
-              minimatch(file.filename, pattern, { nocase: true })
-            )
+            FILE_EXTENSIONS.has(extname(file.filename).toLowerCase())
         )
         .map((file) => file.filename) || []
     )
@@ -54,9 +52,7 @@ export async function getChangedFiles(token: string): Promise<string[]> {
     .filter(
       (file) =>
         file.status !== 'removed' &&
-        FILE_PATTERNS.some((pattern) =>
-          minimatch(file.filename, pattern, { nocase: true })
-        )
+        FILE_EXTENSIONS.has(extname(file.filename).toLowerCase())
     )
     .map((file) => file.filename)
 }
