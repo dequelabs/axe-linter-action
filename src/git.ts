@@ -1,19 +1,24 @@
 import * as github from '@actions/github'
 import * as core from '@actions/core'
-import { minimatch } from 'minimatch'
+import { extname } from 'path'
 
-const FILE_PATTERNS = [
-  '**/*.js',
-  '**/*.jsx',
-  '**/*.tsx',
-  '**/*.esm',
-  '**/*.html',
-  '**/*.htm',
-  '**/*.vue',
-  '**/*.md',
-  '**/*.markdown',
-  '**/*.liquid'
-] as const
+const FILE_EXTENSIONS = new Set([
+  '.js',
+  '.jsx',
+  '.tsx',
+  '.esm',
+  '.html',
+  '.htm',
+  '.vue',
+  '.md',
+  '.markdown',
+  '.liquid'
+])
+
+function isSupportedFile(filename: string): boolean {
+  const hasDotSegment = filename.split('/').some((seg) => seg.startsWith('.'))
+  return !hasDotSegment && FILE_EXTENSIONS.has(extname(filename).toLowerCase())
+}
 
 export async function getChangedFiles(token: string): Promise<string[]> {
   const octokit = github.getOctokit(token)
@@ -34,11 +39,7 @@ export async function getChangedFiles(token: string): Promise<string[]> {
     return (
       response.data.files
         ?.filter(
-          (file) =>
-            file.status !== 'removed' &&
-            FILE_PATTERNS.some((pattern) =>
-              minimatch(file.filename, pattern, { nocase: true })
-            )
+          (file) => file.status !== 'removed' && isSupportedFile(file.filename)
         )
         .map((file) => file.filename) || []
     )
@@ -52,11 +53,7 @@ export async function getChangedFiles(token: string): Promise<string[]> {
 
   return response.data
     .filter(
-      (file) =>
-        file.status !== 'removed' &&
-        FILE_PATTERNS.some((pattern) =>
-          minimatch(file.filename, pattern, { nocase: true })
-        )
+      (file) => file.status !== 'removed' && isSupportedFile(file.filename)
     )
     .map((file) => file.filename)
 }
