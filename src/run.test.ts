@@ -1,5 +1,5 @@
 import 'mocha'
-import { assert } from 'chai'
+import assert from 'node:assert/strict'
 import * as sinon from 'sinon'
 import { stringify } from 'yaml'
 import run, { getOnlyFiles } from './run'
@@ -78,30 +78,33 @@ describe('run', () => {
     await run(mockCore)
 
     // Verify inputs were processed correctly
-    assert.isTrue(
+    assert.strictEqual(
       (mockCore.getInput as sinon.SinonStub).calledWith('github_token', {
         required: true
-      })
+      }),
+      true
     )
-    assert.isTrue(
+    assert.strictEqual(
       (mockCore.getInput as sinon.SinonStub).calledWith('api_key', {
         required: true
-      })
+      }),
+      true
     )
     // Verify files were processed
-    assert.isTrue(getChangedFilesStub.calledWith('test-token'))
+    assert.strictEqual(getChangedFilesStub.calledWith('test-token'), true)
 
-    assert.isTrue(
+    assert.strictEqual(
       lintFilesStub.calledWith(
         ['test.js', 'test.html'],
         'test-api-key',
         'https://test-linter.com',
         mockConfig
-      )
+      ),
+      true
     )
 
     // Verify no errors were reported
-    assert.isFalse((mockCore.setFailed as sinon.SinonStub).called)
+    assert.strictEqual((mockCore.setFailed as sinon.SinonStub).called, false)
   })
 
   it('should handle no changed files', async () => {
@@ -121,21 +124,28 @@ describe('run', () => {
 
     await run(mockCore)
 
-    assert.isTrue(
+    assert.strictEqual(
       (mockCore.debug as sinon.SinonStub).calledWith('No files to lint'),
+      true,
       'Should log debug message for no files'
     )
-    assert.isFalse(
+    assert.strictEqual(
       lintFilesStub.called,
+      false,
       'Linter should not be called with no files'
     )
-    assert.isFalse(
+    assert.strictEqual(
       (mockCore.setFailed as sinon.SinonStub).called,
+      false,
       'Should not set failed status'
     )
 
     // Verify readFileSync was not called
-    assert.isFalse(readFileStub.called, 'Should not attempt to read any files')
+    assert.strictEqual(
+      readFileStub.called,
+      false,
+      'Should not attempt to read any files'
+    )
   })
 
   it('should handle missing config file', async () => {
@@ -159,28 +169,32 @@ describe('run', () => {
     await run(mockCore)
 
     // Verify debug message for missing config
-    assert.isTrue(
+    assert.strictEqual(
       (mockCore.debug as sinon.SinonStub).calledWith(
         'Error loading axe-linter.yml no config found or invalid config: ENOENT'
       ),
+      true,
       'Should log correct debug message for missing config'
     )
 
     // Verify linter was called with correct parameters
-    assert.isTrue(
+    assert.strictEqual(
       lintFilesStub.calledWith(['test.js'], 'test-api-key', '', {}),
+      true,
       'Should call linter with default config'
     )
 
     // Verify readFileSync was called correctly
-    assert.isTrue(
+    assert.strictEqual(
       readFileStub.calledWith('axe-linter.yml', 'utf8'),
+      true,
       'Should attempt to read config file'
     )
 
     // Verify setFailed was not called since linter returned 0 errors
-    assert.isFalse(
+    assert.strictEqual(
       (mockCore.setFailed as sinon.SinonStub).called,
+      false,
       'Should not set failed status'
     )
   })
@@ -207,10 +221,11 @@ describe('run', () => {
 
     await run(mockCore)
 
-    assert.isTrue(
+    assert.strictEqual(
       (mockCore.setFailed as sinon.SinonStub).calledWith(
         'Found 2 accessibility issues'
-      )
+      ),
+      true
     )
   })
 
@@ -236,10 +251,11 @@ describe('run', () => {
 
     await run(mockCore)
 
-    assert.isTrue(
+    assert.strictEqual(
       (mockCore.setFailed as sinon.SinonStub).calledWith(
         'Found 1 accessibility issue'
-      )
+      ),
+      true
     )
   })
 
@@ -251,10 +267,11 @@ describe('run', () => {
 
     await run(mockCore)
 
-    assert.isTrue(
+    assert.strictEqual(
       (mockCore.setFailed as sinon.SinonStub).calledWith(
         'Input required and not supplied: github_token'
-      )
+      ),
+      true
     )
   })
 
@@ -276,8 +293,9 @@ describe('run', () => {
 
     await run(mockCore)
 
-    assert.isTrue(
-      (mockCore.setFailed as sinon.SinonStub).calledWith('Git error')
+    assert.strictEqual(
+      (mockCore.setFailed as sinon.SinonStub).calledWith('Git error'),
+      true
     )
   })
 
@@ -326,8 +344,9 @@ describe('run', () => {
 
       await run(mockCore)
 
-      assert.isFalse(
+      assert.strictEqual(
         getChangedFilesStub.called,
+        false,
         'getChangedFiles should not be called when AXE_LINTER_ONLY is set'
       )
       assert.deepEqual(lintFilesStub.getCall(0).args[0], [
@@ -357,7 +376,7 @@ describe('run', () => {
 
       await run(mockCore)
 
-      assert.isFalse(getChangedFilesStub.called)
+      assert.strictEqual(getChangedFilesStub.called, false)
       assert.deepEqual(lintFilesStub.getCall(0).args[0], [
         'fixtures/accessible.html',
         'fixtures/accessible.vue'
@@ -383,8 +402,8 @@ describe('run', () => {
 
       await run(mockCore)
 
-      assert.isTrue(getChangedFilesStub.called)
-      assert.isFalse(globSyncStub.called)
+      assert.strictEqual(getChangedFilesStub.called, true)
+      assert.strictEqual(globSyncStub.called, false)
     })
 
     it('should handle multiple glob patterns separated by newlines', async () => {
@@ -412,7 +431,7 @@ describe('run', () => {
 
       await run(mockCore)
 
-      assert.isFalse(getChangedFilesStub.called)
+      assert.strictEqual(getChangedFilesStub.called, false)
       assert.deepEqual(lintFilesStub.getCall(0).args[0], [
         'fixtures/accessible.html',
         'fixtures/accessible.htm',
@@ -446,7 +465,7 @@ describe('getOnlyFiles', () => {
   it('should return empty array when env var is not set', () => {
     const result = getOnlyFiles()
     assert.deepEqual(result, [])
-    assert.isFalse(globSyncStub.called)
+    assert.strictEqual(globSyncStub.called, false)
   })
 
   it('should resolve glob patterns from env var', () => {
