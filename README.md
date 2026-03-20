@@ -32,7 +32,6 @@ jobs:
       - uses: dequelabs/axe-linter-action@v1
         with:
           api_key: ${{ secrets.AXE_LINTER_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ## Example Usage for private repository.
@@ -55,7 +54,6 @@ jobs:
       - uses: dequelabs/axe-linter-action@v1
         with:
           api_key: ${{ secrets.AXE_LINTER_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ## Limitation
