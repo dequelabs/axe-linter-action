@@ -1,7 +1,7 @@
 import 'mocha'
 import { assert } from 'chai'
 import * as sinon from 'sinon'
-import * as yaml from 'js-yaml'
+import { stringify } from 'yaml'
 import run, { getOnlyFiles } from './run'
 import * as gitModule from './git'
 import * as linterModule from './linter'
@@ -70,7 +70,7 @@ describe('run', () => {
     const mockConfig = { rules: { 'test-rule': 'error' } }
     readFileStub
       .withArgs('axe-linter.yml', 'utf8')
-      .returns(yaml.dump(mockConfig))
+      .returns(stringify(mockConfig))
 
     // Setup linter response
     lintFilesStub.resolves(0)
