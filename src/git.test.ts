@@ -467,8 +467,6 @@ describe('git', () => {
       const result = await getChangedFiles(token)
 
       assert.deepEqual(result, ['src/app.js'])
-      assert.notInclude(result, '.eslintrc.js')
-      assert.notInclude(result, '.prettierrc.js')
     })
 
     it('should exclude files under dot-directories', async () => {
@@ -486,9 +484,6 @@ describe('git', () => {
       const result = await getChangedFiles(token)
 
       assert.deepEqual(result, ['docs/guide.md'])
-      assert.notInclude(result, '.github/README.md')
-      assert.notInclude(result, '.github/workflows/ci.html')
-      assert.notInclude(result, 'src/.hidden/utils.js')
     })
 
     it('should handle push event diff correctly', async () => {
