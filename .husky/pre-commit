@@ -2,11 +2,6 @@
 
 cd "$(dirname -- "$0")/../."
 
-# Merge commits have no source changes to lint
-if [ -f .git/MERGE_HEAD ]; then
-  exit 0
-fi
-
 yarn build
 
 git add .
