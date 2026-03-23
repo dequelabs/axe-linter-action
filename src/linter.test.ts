@@ -1,5 +1,5 @@
 import 'mocha'
-import { assert } from 'chai'
+import assert from 'node:assert/strict'
 import * as sinon from 'sinon'
 import * as core from '@actions/core'
 import nock from 'nock'
@@ -109,7 +109,7 @@ describe('linter', () => {
       assert.equal(errorStub.callCount, 2, 'should report each error')
 
       // Verify error reporting
-      assert.isTrue(
+      assert.strictEqual(
         errorStub.calledWith(
           'test.js:1 - test-rule-1 - Test error 1\nhttps://test-help-url-1.com',
           {
@@ -120,10 +120,11 @@ describe('linter', () => {
             title: 'Axe Linter'
           }
         ),
+        true,
         'should report first error correctly'
       )
 
-      assert.isTrue(
+      assert.strictEqual(
         errorStub.calledWith(
           'test.html:1 - test-rule-2 - Test error 2\nhttps://test-help-url-2.com',
           {
@@ -134,6 +135,7 @@ describe('linter', () => {
             title: 'Axe Linter'
           }
         ),
+        true,
         'should report second error correctly'
       )
     })
@@ -168,7 +170,7 @@ describe('linter', () => {
       )
 
       assert.equal(errorCount, 1, 'should return one error for single file')
-      assert.isTrue(scope.isDone(), 'API request should be made')
+      assert.strictEqual(scope.isDone(), true, 'API request should be made')
     })
 
     it('should skip empty files', async () => {
@@ -185,11 +187,16 @@ describe('linter', () => {
       )
 
       assert.equal(errorCount, 0, 'should return zero errors for empty files')
-      assert.isTrue(
+      assert.strictEqual(
         debugStub.calledWith('Skipping empty file empty.js'),
+        true,
         'should log debug message'
       )
-      assert.isFalse(scope.isDone(), 'no HTTP requests should be made')
+      assert.strictEqual(
+        scope.isDone(),
+        false,
+        'no HTTP requests should be made'
+      )
     })
 
     it('should handle linter API errors', async () => {
@@ -206,9 +213,9 @@ describe('linter', () => {
         await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
         assert.fail('should have thrown an error')
       } catch (error) {
-        assert.instanceOf(error, Error)
+        assert.ok(error instanceof Error)
         assert.equal(error.message, 'API Error')
-        assert.isTrue(scope.isDone(), 'API request should be made')
+        assert.strictEqual(scope.isDone(), true, 'API request should be made')
       }
     })
 
@@ -223,9 +230,13 @@ describe('linter', () => {
         await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
         assert.fail('should have thrown an error')
       } catch (error) {
-        assert.instanceOf(error, Error)
+        assert.ok(error instanceof Error)
         assert.equal(error.message, 'ENOENT')
-        assert.isFalse(scope.isDone(), 'no HTTP requests should be made')
+        assert.strictEqual(
+          scope.isDone(),
+          false,
+          'no HTTP requests should be made'
+        )
       }
     })
 
@@ -243,9 +254,9 @@ describe('linter', () => {
         await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
         assert.fail('should have thrown an error')
       } catch (error) {
-        assert.instanceOf(error, Error)
-        assert.include(error.message, 'Network Error')
-        assert.isTrue(scope.isDone(), 'API request should be made')
+        assert.ok(error instanceof Error)
+        assert.ok(error.message.includes('Network Error'))
+        assert.strictEqual(scope.isDone(), true, 'API request should be made')
       }
     })
 
@@ -263,8 +274,8 @@ describe('linter', () => {
         await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
         assert.fail('should have thrown an error')
       } catch (error) {
-        assert.instanceOf(error, Error)
-        assert.isTrue(scope.isDone(), 'API request should be made')
+        assert.ok(error instanceof Error)
+        assert.strictEqual(scope.isDone(), true, 'API request should be made')
       }
     })
 
@@ -282,8 +293,8 @@ describe('linter', () => {
         await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
         assert.fail('should have thrown an error')
       } catch (error) {
-        assert.instanceOf(error, Error)
-        assert.isTrue(scope.isDone(), 'API request should be made')
+        assert.ok(error instanceof Error)
+        assert.strictEqual(scope.isDone(), true, 'API request should be made')
       }
     })
 
@@ -309,8 +320,9 @@ describe('linter', () => {
         assert.fail('Should have thrown an error')
       } catch (error) {
         // Verify that the caught error is our non-Error object
-        assert.isFalse(
+        assert.strictEqual(
           error instanceof Error,
+          false,
           'Error should not be an Error instance'
         )
         assert.deepEqual(
@@ -362,9 +374,9 @@ describe('linter', () => {
         await lintFiles(files, apiKey, axeLinterUrl, invalidLinterConfig)
         assert.fail('Should have thrown an error')
       } catch (error) {
-        assert.instanceOf(error, Error)
-        assert.include(error.message, 'Invalid config')
-        assert.isTrue(scope.isDone(), 'API request should be made')
+        assert.ok(error instanceof Error)
+        assert.ok(error.message.includes('Invalid config'))
+        assert.strictEqual(scope.isDone(), true, 'API request should be made')
       }
     })
   })

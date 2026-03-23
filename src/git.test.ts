@@ -1,5 +1,5 @@
 import 'mocha'
-import { assert } from 'chai'
+import assert from 'node:assert/strict'
 import sinon from 'sinon'
 import * as github from '@actions/github'
 import * as core from '@actions/core'
@@ -65,16 +65,18 @@ describe('git', () => {
 
       const result = await getChangedFiles(token)
 
-      assert.isTrue(
+      assert.strictEqual(
         githubStub.calledWith(token),
+        true,
         'getOctokit should be called with correct token'
       )
-      assert.isTrue(
+      assert.strictEqual(
         mockOctokit.rest.pulls.listFiles.calledWith({
           owner: 'test-owner',
           repo: 'test-repo',
           pull_number: 123
         }),
+        true,
         'listFiles should be called with correct parameters'
       )
 
@@ -105,17 +107,19 @@ describe('git', () => {
 
       const result = await getChangedFiles(token)
 
-      assert.isTrue(
+      assert.strictEqual(
         githubStub.calledWith(token),
+        true,
         'getOctokit should be called with correct token'
       )
-      assert.isTrue(
+      assert.strictEqual(
         mockOctokit.rest.repos.compareCommits.calledWith({
           owner: 'test-owner',
           repo: 'test-repo',
           base: 'old-sha',
           head: 'new-sha'
         }),
+        true,
         'compareCommits should be called with correct parameters'
       )
 
@@ -124,8 +128,9 @@ describe('git', () => {
         ['test.jsx', 'test.vue', 'test.html'],
         'should return correct filtered files'
       )
-      assert.isTrue(
+      assert.strictEqual(
         debugStub.calledWith('Not a pull request, checking push diff'),
+        true,
         'should log debug message'
       )
     })
@@ -139,8 +144,8 @@ describe('git', () => {
 
       const result = await getChangedFiles(token)
 
-      assert.isArray(result, 'should return an array')
-      assert.isEmpty(result, 'should return empty array')
+      assert.ok(Array.isArray(result), 'should return an array')
+      assert.strictEqual(result.length, 0, 'should return empty array')
     })
 
     it('should handle undefined files in compare commits response', async () => {
@@ -155,8 +160,8 @@ describe('git', () => {
 
       const result = await getChangedFiles(token)
 
-      assert.isArray(result, 'should return an array')
-      assert.isEmpty(result, 'should return empty array')
+      assert.ok(Array.isArray(result), 'should return an array')
+      assert.strictEqual(result.length, 0, 'should return empty array')
     })
 
     it('should filter out unsupported file types', async () => {
@@ -174,8 +179,8 @@ describe('git', () => {
 
       const result = await getChangedFiles(token)
 
-      assert.isArray(result, 'should return an array')
-      assert.isEmpty(result, 'should return empty array')
+      assert.ok(Array.isArray(result), 'should return an array')
+      assert.strictEqual(result.length, 0, 'should return empty array')
     })
 
     it('should throw an error when API call fails', async () => {
@@ -210,8 +215,8 @@ describe('git', () => {
       const result = await getChangedFiles(token)
 
       assert.deepEqual(result, ['test.js', 'modified.jsx', 'test.tsx'])
-      assert.notInclude(result, 'removed.js')
-      assert.notInclude(result, 'deleted.md')
+      assert.ok(!result.includes('removed.js'))
+      assert.ok(!result.includes('deleted.md'))
     })
 
     it('should exclude deleted files in push event', async () => {
@@ -234,10 +239,11 @@ describe('git', () => {
       const result = await getChangedFiles(token)
 
       assert.deepEqual(result, ['test.vue', 'test.html'])
-      assert.notInclude(result, 'deleted.js')
-      assert.notInclude(result, 'removed.md')
-      assert.isTrue(
-        debugStub.calledWith('Not a pull request, checking push diff')
+      assert.ok(!result.includes('deleted.js'))
+      assert.ok(!result.includes('removed.md'))
+      assert.strictEqual(
+        debugStub.calledWith('Not a pull request, checking push diff'),
+        true
       )
     })
 
@@ -259,7 +265,7 @@ describe('git', () => {
       const result = await getChangedFiles(token)
 
       assert.deepEqual(result, ['test1.js', 'test2.js', 'test3.js', 'test5.js'])
-      assert.notInclude(result, 'test4.js')
+      assert.ok(!result.includes('test4.js'))
     })
   })
   describe('file pattern matching', () => {
@@ -281,14 +287,16 @@ describe('git', () => {
 
       const result = await getChangedFiles(token)
 
-      assert.includeMembers(result, [
+      for (const file of [
         'src/app.js',
         'test/test.js',
         'src/components/Button.jsx',
         'src/utils/helper.esm'
-      ])
-      assert.notInclude(result, 'src/types.ts')
-      assert.notInclude(result, 'src/styles.css')
+      ]) {
+        assert.ok(result.includes(file), `expected result to include "${file}"`)
+      }
+      assert.ok(!result.includes('src/types.ts'))
+      assert.ok(!result.includes('src/styles.css'))
     })
 
     it('should match HTML files correctly', async () => {
@@ -309,14 +317,16 @@ describe('git', () => {
 
       const result = await getChangedFiles(token)
 
-      assert.includeMembers(result, [
+      for (const file of [
         'index.html',
         'public/about.htm',
         'templates/page.html',
         'templates/page.liquid'
-      ])
-      assert.notInclude(result, 'docs/readme.txt')
-      assert.notInclude(result, 'styles/main.css')
+      ]) {
+        assert.ok(result.includes(file), `expected result to include "${file}"`)
+      }
+      assert.ok(!result.includes('docs/readme.txt'))
+      assert.ok(!result.includes('styles/main.css'))
     })
 
     it('should handle case insensitive matching', async () => {
@@ -338,7 +348,7 @@ describe('git', () => {
 
       const result = await getChangedFiles(token)
 
-      assert.includeMembers(result, [
+      for (const file of [
         'src/App.JS',
         'src/Component.JSX',
         'docs/README.MD',
@@ -346,7 +356,9 @@ describe('git', () => {
         'public/INDEX.HTML',
         'src/Test.VUE',
         'templates/page.LIQUID'
-      ])
+      ]) {
+        assert.ok(result.includes(file), `expected result to include "${file}"`)
+      }
     })
 
     it('should handle nested paths correctly', async () => {
@@ -366,13 +378,15 @@ describe('git', () => {
 
       const result = await getChangedFiles(token)
 
-      assert.includeMembers(result, [
+      for (const file of [
         'deeply/nested/path/component.jsx',
         'very/deep/structure/util.js',
         'nested/docs/guide.md',
         'a/b/c/d/e/f/page.html',
         'deep/path/app.vue'
-      ])
+      ]) {
+        assert.ok(result.includes(file), `expected result to include "${file}"`)
+      }
     })
 
     it('should handle files without extensions correctly', async () => {
@@ -392,11 +406,13 @@ describe('git', () => {
 
       const result = await getChangedFiles(token)
 
-      assert.includeMembers(result, ['test.html'])
-      assert.notInclude(result, 'README')
-      assert.notInclude(result, 'LICENSE')
-      assert.notInclude(result, 'docs/markdown')
-      assert.notInclude(result, 'test.')
+      for (const file of ['test.html']) {
+        assert.ok(result.includes(file), `expected result to include "${file}"`)
+      }
+      assert.ok(!result.includes('README'))
+      assert.ok(!result.includes('LICENSE'))
+      assert.ok(!result.includes('docs/markdown'))
+      assert.ok(!result.includes('test.'))
     })
 
     it('should exclude dotfiles', async () => {
@@ -413,8 +429,8 @@ describe('git', () => {
       const result = await getChangedFiles(token)
 
       assert.deepEqual(result, ['src/app.js'])
-      assert.notInclude(result, '.eslintrc.js')
-      assert.notInclude(result, '.prettierrc.js')
+      assert.ok(!result.includes('.eslintrc.js'))
+      assert.ok(!result.includes('.prettierrc.js'))
     })
 
     it('should exclude files under dot-directories', async () => {
@@ -432,9 +448,42 @@ describe('git', () => {
       const result = await getChangedFiles(token)
 
       assert.deepEqual(result, ['docs/guide.md'])
-      assert.notInclude(result, '.github/README.md')
-      assert.notInclude(result, '.github/workflows/ci.html')
-      assert.notInclude(result, 'src/.hidden/utils.js')
+      assert.ok(!result.includes('.github/README.md'))
+      assert.ok(!result.includes('.github/workflows/ci.html'))
+      assert.ok(!result.includes('src/.hidden/utils.js'))
+    })
+
+    it('should exclude dotfiles', async () => {
+      const mockFiles = [
+        { filename: '.eslintrc.js', status: 'modified' },
+        { filename: '.prettierrc.js', status: 'added' },
+        { filename: 'src/app.js', status: 'added' }
+      ]
+
+      mockOctokit.rest.repos.compareCommits.resolves({
+        data: { files: mockFiles }
+      })
+
+      const result = await getChangedFiles(token)
+
+      assert.deepEqual(result, ['src/app.js'])
+    })
+
+    it('should exclude files under dot-directories', async () => {
+      const mockFiles = [
+        { filename: '.github/README.md', status: 'modified' },
+        { filename: '.github/workflows/ci.html', status: 'added' },
+        { filename: 'src/.hidden/utils.js', status: 'added' },
+        { filename: 'docs/guide.md', status: 'added' }
+      ]
+
+      mockOctokit.rest.repos.compareCommits.resolves({
+        data: { files: mockFiles }
+      })
+
+      const result = await getChangedFiles(token)
+
+      assert.deepEqual(result, ['docs/guide.md'])
     })
 
     it('should handle push event diff correctly', async () => {
@@ -460,7 +509,9 @@ describe('git', () => {
 
       const result = await getChangedFiles(token)
 
-      assert.includeMembers(result, ['src/app.js', 'test/test.jsx'])
+      for (const file of ['src/app.js', 'test/test.jsx']) {
+        assert.ok(result.includes(file), `expected result to include "${file}"`)
+      }
     })
   })
 })
