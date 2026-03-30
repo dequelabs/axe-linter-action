@@ -429,44 +429,6 @@ describe('git', () => {
       const result = await getChangedFiles(token)
 
       assert.deepEqual(result, ['src/app.js'])
-      assert.ok(!result.includes('.eslintrc.js'))
-      assert.ok(!result.includes('.prettierrc.js'))
-    })
-
-    it('should exclude files under dot-directories', async () => {
-      const mockFiles = [
-        { filename: '.github/README.md', status: 'modified' },
-        { filename: '.github/workflows/ci.html', status: 'added' },
-        { filename: 'src/.hidden/utils.js', status: 'added' },
-        { filename: 'docs/guide.md', status: 'added' }
-      ]
-
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: { files: mockFiles }
-      })
-
-      const result = await getChangedFiles(token)
-
-      assert.deepEqual(result, ['docs/guide.md'])
-      assert.ok(!result.includes('.github/README.md'))
-      assert.ok(!result.includes('.github/workflows/ci.html'))
-      assert.ok(!result.includes('src/.hidden/utils.js'))
-    })
-
-    it('should exclude dotfiles', async () => {
-      const mockFiles = [
-        { filename: '.eslintrc.js', status: 'modified' },
-        { filename: '.prettierrc.js', status: 'added' },
-        { filename: 'src/app.js', status: 'added' }
-      ]
-
-      mockOctokit.rest.repos.compareCommits.resolves({
-        data: { files: mockFiles }
-      })
-
-      const result = await getChangedFiles(token)
-
-      assert.deepEqual(result, ['src/app.js'])
     })
 
     it('should exclude files under dot-directories', async () => {
