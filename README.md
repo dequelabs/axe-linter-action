@@ -68,3 +68,5 @@ There is a limitation on the amount of annotations that can be made per step.
 If there are more errors, they will not be reported. If you would like to view the errors please view the action logs.
 
 Additional information can be found in [this GitHub discussion](https://github.com/orgs/community/discussions/26680).
+
+Individual files larger than 900 MB are skipped and logged as a warning. The axe-linter API has a 1 GB request size cap, so oversized files are filtered out pre-emptively to avoid 413 server request errors.
