@@ -256,7 +256,7 @@ describe('linter', () => {
       )
       assert.match(
         warningStub.firstCall.args[0],
-        /Skipping huge\.js: file size \(\d+ MB\) exceeds 900MB limit/,
+        /Skipping huge\.js: file size \(\d+ MB\) exceeds 900 MB limit/,
         'should log warning message about the oversized file'
       )
       assert.strictEqual(

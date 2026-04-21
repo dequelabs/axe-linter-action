@@ -3,7 +3,9 @@ import { readFileSync, statSync } from 'fs'
 import type { LinterResponse } from './types'
 import { pluralize } from './utils'
 
-const MAX_FILE_SIZE_BYTES = 900 * 1024 * 1024
+const BYTES_PER_MB = 1024 * 1024
+const MAX_FILE_SIZE_BYTES = 900 * BYTES_PER_MB
+const MAX_FILE_SIZE_MB = MAX_FILE_SIZE_BYTES / BYTES_PER_MB
 
 export async function lintFiles(
   files: string[],
@@ -18,9 +20,9 @@ export async function lintFiles(
 
     // Skip files exceeding the size limit
     if (fileSize > MAX_FILE_SIZE_BYTES) {
-      const sizeMB = Math.round(fileSize / (1024 * 1024))
+      const sizeMB = Math.round(fileSize / BYTES_PER_MB)
       core.warning(
-        `Skipping ${file}: file size (${sizeMB} MB) exceeds 900MB limit`
+        `Skipping ${file}: file size (${sizeMB} MB) exceeds ${MAX_FILE_SIZE_MB} MB limit`
       )
       continue
     }
