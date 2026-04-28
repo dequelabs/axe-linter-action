@@ -33615,10 +33615,22 @@ ${pendingInterceptorsFormatter.format(pending)}
       const core = __importStar(__nccwpck_require__(7484))
       const fs_1 = __nccwpck_require__(9896)
       const utils_1 = __nccwpck_require__(1798)
+      const BYTES_PER_MB = 1024 * 1024
+      const MAX_FILE_SIZE_BYTES = 900 * BYTES_PER_MB
+      const MAX_FILE_SIZE_MB = MAX_FILE_SIZE_BYTES / BYTES_PER_MB
       function lintFiles(files, apiKey, axeLinterUrl, linterConfig) {
         return __awaiter(this, void 0, void 0, function* () {
           let totalErrors = 0
           for (const file of files) {
+            const fileSize = (0, fs_1.statSync)(file).size
+            // Skip files exceeding the size limit
+            if (fileSize > MAX_FILE_SIZE_BYTES) {
+              const sizeMB = Math.round(fileSize / BYTES_PER_MB)
+              core.warning(
+                `Skipping ${file}: file size (${sizeMB} MB) exceeds ${MAX_FILE_SIZE_MB} MB limit`
+              )
+              continue
+            }
             const fileContents = (0, fs_1.readFileSync)(file, 'utf8')
             // Skip empty files
             if (!fileContents.trim()) {

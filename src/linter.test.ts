@@ -21,6 +21,8 @@ describe('linter', () => {
 
     let mockAgent: MockAgent
     let mockPool: Interceptable
+    let warningStub: sinon.SinonStub
+    let statSyncStub: sinon.SinonStub
 
     beforeEach(() => {
       sandbox = sinon.createSandbox()
@@ -28,10 +30,14 @@ describe('linter', () => {
       // Stub core functions
       errorStub = sandbox.stub(core, 'error')
       debugStub = sandbox.stub(core, 'debug')
+      warningStub = sandbox.stub(core, 'warning')
 
       // Stub file system
       readFileStub = sandbox.stub()
       sandbox.replace(require('fs'), 'readFileSync', readFileStub)
+
+      statSyncStub = sandbox.stub().returns({ size: 100 })
+      sandbox.replace(require('fs'), 'statSync', statSyncStub)
 
       // Enable mock agent
       mockAgent = new MockAgent()
@@ -207,6 +213,47 @@ describe('linter', () => {
         debugStub.calledWith('Skipping empty file empty.js'),
         true,
         'should log debug message'
+      )
+      assert.ok(
+        mockAgent.pendingInterceptors().length > 0,
+        'no HTTP requests should be made'
+      )
+    })
+
+    it('should skip files exceeding the size limit', async () => {
+      const files = ['huge.js']
+      statSyncStub.withArgs('huge.js').returns({ size: 900 * 1024 * 1024 + 1 })
+
+      mockPool
+        .intercept({ path: '/lint-source', method: 'POST' })
+        .reply(200, {})
+
+      const errorCount = await lintFiles(
+        files,
+        apiKey,
+        axeLinterUrl,
+        linterConfig
+      )
+
+      assert.equal(
+        errorCount,
+        0,
+        'should return zero errors for oversized files'
+      )
+      assert.strictEqual(
+        warningStub.calledOnce,
+        true,
+        'should call core.warning exactly once'
+      )
+      assert.match(
+        warningStub.firstCall.args[0],
+        /Skipping huge\.js: file size \(\d+ MB\) exceeds 900 MB limit/,
+        'should log warning message about the oversized file'
+      )
+      assert.strictEqual(
+        readFileStub.calledWith('huge.js', 'utf8'),
+        false,
+        'should not read the oversized file'
       )
       assert.ok(
         mockAgent.pendingInterceptors().length > 0,
