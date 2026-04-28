@@ -24,7 +24,9 @@ function wasCalledWith(fn: any, ...expectedArgs: unknown[]): boolean {
 describe('linter', () => {
   let errorStub: any
   let debugStub: any
+  let warningStub: any
   let readFileMock: any
+  let statSyncMock: any
 
   describe('lintFiles', () => {
     const apiKey = 'test-api-key'
@@ -38,12 +40,16 @@ describe('linter', () => {
       // Stub core functions
       errorStub = mock.method(core, 'error', () => {})
       debugStub = mock.method(core, 'debug', () => {})
+      warningStub = mock.method(core, 'warning', () => {})
       mock.method(core, 'startGroup', () => {})
       mock.method(core, 'info', () => {})
       mock.method(core, 'endGroup', () => {})
 
       // Stub file system
       readFileMock = mock.method(require('fs'), 'readFileSync', () => '')
+      statSyncMock = mock.method(require('fs'), 'statSync', () => ({
+        size: 100
+      }))
 
       // Enable mock agent
       mockAgent = new MockAgent()
@@ -217,6 +223,52 @@ describe('linter', () => {
       assert.ok(
         wasCalledWith(debugStub, 'Skipping empty file empty.js'),
         'should log debug message'
+      )
+      assert.ok(
+        mockAgent.pendingInterceptors().length > 0,
+        'no HTTP requests should be made'
+      )
+    })
+
+    it('should skip files exceeding the size limit', async () => {
+      const files = ['huge.js']
+      statSyncMock.mock.mockImplementation((path: string) => {
+        if (path === 'huge.js') return { size: 900 * 1024 * 1024 + 1 }
+        return { size: 100 }
+      })
+
+      mockPool
+        .intercept({ path: '/lint-source', method: 'POST' })
+        .reply(200, {})
+
+      const errorCount = await lintFiles(
+        files,
+        apiKey,
+        axeLinterUrl,
+        linterConfig
+      )
+
+      assert.equal(
+        errorCount,
+        0,
+        'should return zero errors for oversized files'
+      )
+      assert.strictEqual(
+        warningStub.mock.callCount(),
+        1,
+        'should call core.warning exactly once'
+      )
+      assert.match(
+        warningStub.mock.calls[0].arguments[0],
+        /Skipping huge\.js: file size \(\d+ MB\) exceeds 900 MB limit/,
+        'should log warning message about the oversized file'
+      )
+      assert.strictEqual(
+        readFileMock.mock.calls.every(
+          (call: any) => call.arguments[0] !== 'huge.js'
+        ),
+        true,
+        'should not read the oversized file'
       )
       assert.ok(
         mockAgent.pendingInterceptors().length > 0,
