@@ -4,7 +4,7 @@
   "private": true,
   "license": "MPL-2.0",
   "scripts": {
-    "prebuild": "rimraf dist",
+    "prebuild": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\"",
     "build": "ncc build src/index.ts --license licenses.txt",
     "lint": "eslint .",
     "fmt": "prettier --write .",
@@ -24,7 +24,6 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.4.3",
     "prettier": "^3.4.2",
-    "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.23.0"
