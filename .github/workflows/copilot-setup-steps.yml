@@ -1,0 +1,64 @@
+name: 'Copilot Setup Steps'
+
+# Automatically run the setup steps when they are changed to allow for easy validation, and
+# allow manual testing through the repository's "Actions" tab
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - 'copilot/**'
+      - 'dependabot/**'
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+jobs:
+  # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
+  copilot-setup-steps:
+    name: Copilot Setup Steps
+    # Set the permissions to the lowest permissions possible needed for your steps.
+    # Copilot will be given its own token for its operations.
+    permissions:
+      contents: read # To clone the repository
+    # Note: Do not try to run inside of a container yet. That causes all the setup scripts
+    # by Copilot to fail since that triggers `sh` instead of `bash` for runs. Setting
+    # defaults to bash does not fix it.
+    runs-on: ubuntu-24.04
+
+    # You can define any steps you want, and they will run before the agent starts.
+    # If you do not check out your code, Copilot will do this for you.
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+        with:
+          version: '10.32.1'
+      - name: Setup NodeJS
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
+      - name: Install Zizmor
+        env:
+          TMP_DIR: ${{ runner.temp }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euC -o pipefail
+          tarball="$TMP_DIR/zizmor.tar.gz"
+          gh release download --repo zizmorcore/zizmor --pattern "zizmor-x86_64-unknown-linux-gnu.tar.gz" --output "$tarball"
+          tar -xzf "$tarball" -C "$TMP_DIR"
+          install -D "$TMP_DIR/zizmor" /usr/local/bin
+          rm "$tarball" "$TMP_DIR/zizmor"
