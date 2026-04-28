@@ -1,25 +1,18 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import * as core from '@actions/core'
-import { MockAgent, setGlobalDispatcher, type Interceptable } from 'undici'
+import {
+  MockAgent,
+  setGlobalDispatcher,
+  getGlobalDispatcher,
+  type Dispatcher,
+  type Interceptable
+} from 'undici'
 import { lintFiles } from './linter'
 import type { LinterResponse } from './types'
+import { wasCalledWith } from './test-utils'
 
 type MockResponses = Record<string, LinterResponse>
-
-function wasCalledWith(fn: any, ...expectedArgs: unknown[]): boolean {
-  return fn.mock.calls.some((call: any) => {
-    try {
-      assert.deepStrictEqual(
-        call.arguments.slice(0, expectedArgs.length),
-        expectedArgs
-      )
-      return true
-    } catch {
-      return false
-    }
-  })
-}
 
 describe('linter', () => {
   let errorStub: any
@@ -35,6 +28,7 @@ describe('linter', () => {
 
     let mockAgent: MockAgent
     let mockPool: Interceptable
+    let originalDispatcher: Dispatcher
 
     beforeEach(() => {
       // Stub core functions
@@ -52,6 +46,7 @@ describe('linter', () => {
       }))
 
       // Enable mock agent
+      originalDispatcher = getGlobalDispatcher()
       mockAgent = new MockAgent()
       setGlobalDispatcher(mockAgent)
       mockAgent.disableNetConnect()
@@ -60,7 +55,11 @@ describe('linter', () => {
 
     afterEach(async () => {
       mock.restoreAll()
-      await mockAgent.close()
+      try {
+        await mockAgent.close()
+      } finally {
+        setGlobalDispatcher(originalDispatcher)
+      }
     })
 
     it('should process files and return total error count', async () => {

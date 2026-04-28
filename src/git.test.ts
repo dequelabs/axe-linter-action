@@ -3,20 +3,7 @@ import assert from 'node:assert/strict'
 import * as github from '@actions/github'
 import * as core from '@actions/core'
 import { getChangedFiles } from './git'
-
-function wasCalledWith(fn: any, ...expectedArgs: unknown[]): boolean {
-  return fn.mock.calls.some((call: any) => {
-    try {
-      assert.deepStrictEqual(
-        call.arguments.slice(0, expectedArgs.length),
-        expectedArgs
-      )
-      return true
-    } catch {
-      return false
-    }
-  })
-}
+import { wasCalledWith } from './test-utils'
 
 describe('git', () => {
   const token = 'test-token'

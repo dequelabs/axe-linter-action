@@ -5,20 +5,7 @@ import run, { getOnlyFiles } from './run'
 import * as gitModule from './git'
 import * as linterModule from './linter'
 import { Core } from './types'
-
-function wasCalledWith(fn: any, ...expectedArgs: unknown[]): boolean {
-  return fn.mock.calls.some((call: any) => {
-    try {
-      assert.deepStrictEqual(
-        call.arguments.slice(0, expectedArgs.length),
-        expectedArgs
-      )
-      return true
-    } catch {
-      return false
-    }
-  })
-}
+import { wasCalledWith } from './test-utils'
 
 describe('run', () => {
   let mockCore: Core
