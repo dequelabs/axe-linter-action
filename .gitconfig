@@ -1,0 +1,7 @@
+[hook "build"]
+  event = pre-commit
+  command = bin/build.sh
+
+[hook "lint-staged"]
+  event = pre-commit
+  command = npx lint-staged
