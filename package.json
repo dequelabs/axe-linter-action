@@ -5,7 +5,7 @@
   "type": "module",
   "license": "MPL-2.0",
   "scripts": {
-    "prebuild": "node -e \"import('fs').then(({rmSync}) => rmSync('dist', { recursive: true, force: true }))\"",
+    "prebuild": "node --input-type=module -e \"const {rmSync} = await import('fs'); rmSync('dist', { recursive: true, force: true })\"",
     "build": "ncc build src/index.ts --license licenses.txt",
     "lint": "eslint .",
     "fmt": "prettier --write .",

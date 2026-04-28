@@ -69,8 +69,11 @@ describe('linter', () => {
     beforeEach(() => {
       errorStub.mock.resetCalls()
       debugStub.mock.resetCalls()
+      warningStub.mock.resetCalls()
       readFileMock.mock.resetCalls()
       readFileMock.mock.mockImplementation(() => '')
+      statSyncMock.mock.resetCalls()
+      statSyncMock.mock.mockImplementation(() => ({ size: 100 }))
 
       // Enable mock agent
       originalDispatcher = getGlobalDispatcher()
