@@ -1,4 +1,4 @@
-import 'mocha'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import * as sinon from 'sinon'
 import * as core from '@actions/core'
@@ -18,9 +18,7 @@ describe('linter', () => {
   let sandbox: sinon.SinonSandbox
   let errorStub: sinon.SinonStub
   let debugStub: sinon.SinonStub
-  let warningStub: sinon.SinonStub
   let readFileStub: sinon.SinonStub
-  let statSyncStub: sinon.SinonStub
 
   describe('lintFiles', () => {
     const apiKey = 'test-api-key'
@@ -29,6 +27,8 @@ describe('linter', () => {
 
     let mockAgent: MockAgent
     let mockPool: Interceptable
+    let warningStub: sinon.SinonStub
+    let statSyncStub: sinon.SinonStub
     let originalDispatcher: Dispatcher
 
     beforeEach(() => {
@@ -56,8 +56,11 @@ describe('linter', () => {
 
     afterEach(async () => {
       sandbox.restore()
-      await mockAgent.close()
-      setGlobalDispatcher(originalDispatcher)
+      try {
+        await mockAgent.close()
+      } finally {
+        setGlobalDispatcher(originalDispatcher)
+      }
     })
 
     it('should process files and return total error count', async () => {

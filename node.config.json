@@ -1,0 +1,13 @@
+{
+  "nodeOptions": {
+    "require": "ts-node/register",
+    "enable-source-maps": true
+  },
+  "test": {
+    "test-timeout": 15000,
+    "test-coverage-branches": 85,
+    "test-coverage-functions": 85,
+    "test-coverage-lines": 85,
+    "test-coverage-exclude": "**/*.test.ts"
+  }
+}
