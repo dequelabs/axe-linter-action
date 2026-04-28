@@ -9,7 +9,7 @@
     "build": "ncc build src/index.ts --license licenses.txt",
     "lint": "eslint .",
     "fmt": "prettier --write .",
-    "prepare": "husky",
+    "prepare": "./bin/use-tracked-config.sh",
     "test": "node --experimental-test-module-mocks --experimental-config-file=node.config.json --test --experimental-test-coverage 'src/**/*.test.ts'"
   },
   "dependencies": {
@@ -22,7 +22,6 @@
     "@types/node": "^24",
     "@vercel/ncc": "^0.38.3",
     "eslint": "^9.20.0",
-    "husky": "^9.1.7",
     "lint-staged": "^15.4.3",
     "prettier": "^3.4.2",
     "typescript": "^5.7.3",
