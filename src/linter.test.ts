@@ -1,6 +1,5 @@
-import { describe, it, beforeEach, afterEach } from 'node:test'
+import { describe, it, beforeEach, afterEach, mock } from 'node:test'
 import assert from 'node:assert/strict'
-import * as sinon from 'sinon'
 import * as core from '@actions/core'
 import {
   MockAgent,
@@ -11,14 +10,16 @@ import {
 } from 'undici'
 import { lintFiles } from './linter'
 import type { LinterResponse } from './types'
+import { wasCalledWith } from './test-utils'
 
 type MockResponses = Record<string, LinterResponse>
 
 describe('linter', () => {
-  let sandbox: sinon.SinonSandbox
-  let errorStub: sinon.SinonStub
-  let debugStub: sinon.SinonStub
-  let readFileStub: sinon.SinonStub
+  let errorStub: any
+  let debugStub: any
+  let warningStub: any
+  let readFileMock: any
+  let statSyncMock: any
 
   describe('lintFiles', () => {
     const apiKey = 'test-api-key'
@@ -27,24 +28,22 @@ describe('linter', () => {
 
     let mockAgent: MockAgent
     let mockPool: Interceptable
-    let warningStub: sinon.SinonStub
-    let statSyncStub: sinon.SinonStub
     let originalDispatcher: Dispatcher
 
     beforeEach(() => {
-      sandbox = sinon.createSandbox()
-
       // Stub core functions
-      errorStub = sandbox.stub(core, 'error')
-      debugStub = sandbox.stub(core, 'debug')
-      warningStub = sandbox.stub(core, 'warning')
+      errorStub = mock.method(core, 'error', () => {})
+      debugStub = mock.method(core, 'debug', () => {})
+      warningStub = mock.method(core, 'warning', () => {})
+      mock.method(core, 'startGroup', () => {})
+      mock.method(core, 'info', () => {})
+      mock.method(core, 'endGroup', () => {})
 
       // Stub file system
-      readFileStub = sandbox.stub()
-      sandbox.replace(require('fs'), 'readFileSync', readFileStub)
-
-      statSyncStub = sandbox.stub().returns({ size: 100 })
-      sandbox.replace(require('fs'), 'statSync', statSyncStub)
+      readFileMock = mock.method(require('fs'), 'readFileSync', () => '')
+      statSyncMock = mock.method(require('fs'), 'statSync', () => ({
+        size: 100
+      }))
 
       // Enable mock agent
       originalDispatcher = getGlobalDispatcher()
@@ -55,7 +54,7 @@ describe('linter', () => {
     })
 
     afterEach(async () => {
-      sandbox.restore()
+      mock.restoreAll()
       try {
         await mockAgent.close()
       } finally {
@@ -71,9 +70,9 @@ describe('linter', () => {
       }
 
       // Mock file reads
-      for (const file of files) {
-        readFileStub.withArgs(file, 'utf8').returns(fileContents[file])
-      }
+      readFileMock.mock.mockImplementation(
+        (path: string) => fileContents[path] ?? ''
+      )
 
       // Mock linter responses
       const mockResponses: MockResponses = {
@@ -136,11 +135,12 @@ describe('linter', () => {
       )
 
       assert.equal(errorCount, 2, 'should return correct total error count')
-      assert.equal(errorStub.callCount, 2, 'should report each error')
+      assert.equal(errorStub.mock.callCount(), 2, 'should report each error')
 
       // Verify error reporting
-      assert.strictEqual(
-        errorStub.calledWith(
+      assert.ok(
+        wasCalledWith(
+          errorStub,
           'test.js:1 - test-rule-1 - Test error 1\nhttps://test-help-url-1.com',
           {
             file: 'test.js',
@@ -150,12 +150,12 @@ describe('linter', () => {
             title: 'Axe Linter'
           }
         ),
-        true,
         'should report first error correctly'
       )
 
-      assert.strictEqual(
-        errorStub.calledWith(
+      assert.ok(
+        wasCalledWith(
+          errorStub,
           'test.html:1 - test-rule-2 - Test error 2\nhttps://test-help-url-2.com',
           {
             file: 'test.html',
@@ -165,16 +165,14 @@ describe('linter', () => {
             title: 'Axe Linter'
           }
         ),
-        true,
         'should report second error correctly'
       )
     })
 
     it('should handle a single file', async () => {
       const files = ['test.js']
-      const fileContents = { 'test.js': '<div>test</div>' }
 
-      readFileStub.withArgs('test.js', 'utf8').returns(fileContents['test.js'])
+      readFileMock.mock.mockImplementation(() => '<div>test</div>')
 
       mockPool.intercept({ path: '/lint-source', method: 'POST' }).reply(
         200,
@@ -207,7 +205,7 @@ describe('linter', () => {
 
     it('should skip empty files', async () => {
       const files = ['empty.js']
-      readFileStub.withArgs('empty.js', 'utf8').returns('   ')
+      readFileMock.mock.mockImplementation(() => '   ')
 
       mockPool
         .intercept({ path: '/lint-source', method: 'POST' })
@@ -221,9 +219,8 @@ describe('linter', () => {
       )
 
       assert.equal(errorCount, 0, 'should return zero errors for empty files')
-      assert.strictEqual(
-        debugStub.calledWith('Skipping empty file empty.js'),
-        true,
+      assert.ok(
+        wasCalledWith(debugStub, 'Skipping empty file empty.js'),
         'should log debug message'
       )
       assert.ok(
@@ -234,7 +231,10 @@ describe('linter', () => {
 
     it('should skip files exceeding the size limit', async () => {
       const files = ['huge.js']
-      statSyncStub.withArgs('huge.js').returns({ size: 900 * 1024 * 1024 + 1 })
+      statSyncMock.mock.mockImplementation((path: string) => {
+        if (path === 'huge.js') return { size: 900 * 1024 * 1024 + 1 }
+        return { size: 100 }
+      })
 
       mockPool
         .intercept({ path: '/lint-source', method: 'POST' })
@@ -253,18 +253,20 @@ describe('linter', () => {
         'should return zero errors for oversized files'
       )
       assert.strictEqual(
-        warningStub.calledOnce,
-        true,
+        warningStub.mock.callCount(),
+        1,
         'should call core.warning exactly once'
       )
       assert.match(
-        warningStub.firstCall.args[0],
+        warningStub.mock.calls[0].arguments[0],
         /Skipping huge\.js: file size \(\d+ MB\) exceeds 900 MB limit/,
         'should log warning message about the oversized file'
       )
       assert.strictEqual(
-        readFileStub.calledWith('huge.js', 'utf8'),
-        false,
+        readFileMock.mock.calls.every(
+          (call: any) => call.arguments[0] !== 'huge.js'
+        ),
+        true,
         'should not read the oversized file'
       )
       assert.ok(
@@ -275,9 +277,9 @@ describe('linter', () => {
 
     it('should handle linter API errors', async () => {
       const files = ['error.js']
-      readFileStub
-        .withArgs('error.js', 'utf8')
-        .returns('<div><h1>hello world</h1></div>')
+      readFileMock.mock.mockImplementation(
+        () => '<div><h1>hello world</h1></div>'
+      )
 
       mockPool.intercept({ path: '/lint-source', method: 'POST' }).reply(
         200,
@@ -299,8 +301,9 @@ describe('linter', () => {
 
     it('should handle file read errors', async () => {
       const files = ['nonexistent.js']
-      const fileError = new Error('ENOENT')
-      readFileStub.throws(fileError)
+      readFileMock.mock.mockImplementation(() => {
+        throw new Error('ENOENT')
+      })
 
       mockPool
         .intercept({ path: '/lint-source', method: 'POST' })
@@ -321,9 +324,9 @@ describe('linter', () => {
 
     it('should handle network errors', async () => {
       const files = ['test.js']
-      readFileStub
-        .withArgs('test.js', 'utf8')
-        .returns('<div><h1>hello world</h1></div>')
+      readFileMock.mock.mockImplementation(
+        () => '<div><h1>hello world</h1></div>'
+      )
 
       mockPool
         .intercept({ path: '/lint-source', method: 'POST' })
@@ -343,9 +346,9 @@ describe('linter', () => {
 
     it('should handle HTTP errors', async () => {
       const files = ['test.js']
-      readFileStub
-        .withArgs('test.js', 'utf8')
-        .returns('<div><h1>hello world</h1></div>')
+      readFileMock.mock.mockImplementation(
+        () => '<div><h1>hello world</h1></div>'
+      )
 
       mockPool
         .intercept({ path: '/lint-source', method: 'POST' })
@@ -362,9 +365,9 @@ describe('linter', () => {
 
     it('should handle malformed API responses', async () => {
       const files = ['test.js']
-      readFileStub
-        .withArgs('test.js', 'utf8')
-        .returns('<div><h1>hello world</h1></div>')
+      readFileMock.mock.mockImplementation(
+        () => '<div><h1>hello world</h1></div>'
+      )
 
       mockPool.intercept({ path: '/lint-source', method: 'POST' }).reply(
         200,
@@ -386,9 +389,9 @@ describe('linter', () => {
     it('should rethrow non-Error objects', async () => {
       const files = ['test.js']
 
-      readFileStub
-        .withArgs('test.js', 'utf8')
-        .returns('<div><h1>hello world</h1></div>')
+      readFileMock.mock.mockImplementation(
+        () => '<div><h1>hello world</h1></div>'
+      )
 
       // Make fetch throw a non-Error object
       const nonErrorObject = {
@@ -397,8 +400,7 @@ describe('linter', () => {
         statusCode: 500
       }
 
-      const fetchStub = sandbox.stub(globalThis, 'fetch')
-      fetchStub.rejects(nonErrorObject)
+      mock.method(globalThis, 'fetch', () => Promise.reject(nonErrorObject))
 
       try {
         await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
@@ -442,7 +444,7 @@ describe('linter', () => {
       }
 
       // Setup file read
-      readFileStub.withArgs('test.js', 'utf8').returns('const x = 1;')
+      readFileMock.mock.mockImplementation(() => 'const x = 1;')
 
       // Setup interceptor to simulate connection error
       mockPool
