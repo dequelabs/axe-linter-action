@@ -1,6 +1,5 @@
 {
   "nodeOptions": {
-    "require": "ts-node/register",
     "enable-source-maps": true
   },
   "test": {
@@ -8,6 +7,6 @@
     "test-coverage-branches": 85,
     "test-coverage-functions": 85,
     "test-coverage-lines": 85,
-    "test-coverage-exclude": "**/*.test.ts"
+    "test-coverage-exclude": ["**/*.test.ts", "**/test-utils.ts"]
   }
 }
