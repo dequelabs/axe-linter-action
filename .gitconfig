@@ -4,4 +4,4 @@
 
 [hook "lint-staged"]
   event = pre-commit
-  command = npx lint-staged
+  command = npx --no-install lint-staged
