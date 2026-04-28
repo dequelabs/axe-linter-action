@@ -20,8 +20,6 @@ export default [
   {
     files: ['src/**/*.test.ts', 'src/test-utils.ts'],
     rules: {
-      '@typescript-eslint/no-var-requires': 'off',
-      '@typescript-eslint/no-require-imports': 'off',
       '@typescript-eslint/no-explicit-any': 'off'
     }
   },
