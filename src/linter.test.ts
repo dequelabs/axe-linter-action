@@ -2,7 +2,13 @@ import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import * as sinon from 'sinon'
 import * as core from '@actions/core'
-import { MockAgent, setGlobalDispatcher, type Interceptable } from 'undici'
+import {
+  MockAgent,
+  setGlobalDispatcher,
+  getGlobalDispatcher,
+  type Dispatcher,
+  type Interceptable
+} from 'undici'
 import { lintFiles } from './linter'
 import type { LinterResponse } from './types'
 
@@ -23,6 +29,7 @@ describe('linter', () => {
     let mockPool: Interceptable
     let warningStub: sinon.SinonStub
     let statSyncStub: sinon.SinonStub
+    let originalDispatcher: Dispatcher
 
     beforeEach(() => {
       sandbox = sinon.createSandbox()
@@ -40,6 +47,7 @@ describe('linter', () => {
       sandbox.replace(require('fs'), 'statSync', statSyncStub)
 
       // Enable mock agent
+      originalDispatcher = getGlobalDispatcher()
       mockAgent = new MockAgent()
       setGlobalDispatcher(mockAgent)
       mockAgent.disableNetConnect()
@@ -48,7 +56,11 @@ describe('linter', () => {
 
     afterEach(async () => {
       sandbox.restore()
-      await mockAgent.close()
+      try {
+        await mockAgent.close()
+      } finally {
+        setGlobalDispatcher(originalDispatcher)
+      }
     })
 
     it('should process files and return total error count', async () => {
