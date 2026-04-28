@@ -1,0 +1,4 @@
+# 10020 minutes ≈ 6d23h — slightly shorter than our 7-day dependabot
+# cooldown so dependabot PRs aren't blocked, but new installs still reject
+# packages published less than ~7 days ago (supply-chain protection).
+minimumReleaseAge: 10020
