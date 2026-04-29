@@ -7,7 +7,7 @@ import run from './run.ts'
 // EnvHttpProxyAgent reads HTTP_PROXY / HTTPS_PROXY / NO_PROXY from the env so
 // runners behind a corporate proxy work without code changes.
 //
-// RetryAgent makes up to 5 total attempts on network errors and 5xx/429
+// RetryAgent makes up to 5 total attempts on network errors and 408/429/5xx
 // responses, with 2x exponential backoff starting at 300ms (capped at 4s):
 //
 //   ├─ attempt 1   (immediate)
@@ -30,7 +30,8 @@ setGlobalDispatcher(
     minTimeout: 300,
     maxTimeout: 4000,
     timeoutFactor: 2,
-    methods: ['POST', 'GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE', 'TRACE']
+    methods: ['POST', 'GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE', 'TRACE'],
+    statusCodes: [408, 429, 500, 502, 503, 504]
   })
 )
 
