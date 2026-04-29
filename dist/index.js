@@ -30565,7 +30565,7 @@ ${pendingInterceptorsFormatter.format(pending)}
     const { MockCallHistory, MockCallHistoryLog } = __nccwpck_require__(6947)
     const MockAgent = __nccwpck_require__(9457)
     const MockPool = __nccwpck_require__(312)
-    const SnapshotAgent = __nccwpck_require__(2489)
+    const SnapshotAgent = __nccwpck_require__(9632)
     const mockErrors = __nccwpck_require__(4313)
     const RetryHandler = __nccwpck_require__(7292)
     const { getGlobalDispatcher, setGlobalDispatcher } =
@@ -30584,8 +30584,8 @@ ${pendingInterceptorsFormatter.format(pending)}
     __webpack_unused_export__ = Dispatcher1Wrapper
     __webpack_unused_export__ = ProxyAgent
     __webpack_unused_export__ = Socks5ProxyAgent
-    __webpack_unused_export__ = EnvHttpProxyAgent
-    __webpack_unused_export__ = RetryAgent
+    module.exports.J2 = EnvHttpProxyAgent
+    module.exports.cg = RetryAgent
     __webpack_unused_export__ = H2CClient
     __webpack_unused_export__ = RetryHandler
 
@@ -30676,7 +30676,7 @@ ${pendingInterceptorsFormatter.format(pending)}
       }
     }
 
-    __webpack_unused_export__ = setGlobalDispatcher
+    module.exports.bj = setGlobalDispatcher
     __webpack_unused_export__ = getGlobalDispatcher
 
     const fetchImpl = __nccwpck_require__(8818).fetch
@@ -49843,7 +49843,7 @@ ${pendingInterceptorsFormatter.format(pending)}
     /***/
   },
 
-  /***/ 2489: /***/ (module, __unused_webpack_exports, __nccwpck_require__) => {
+  /***/ 9632: /***/ (module, __unused_webpack_exports, __nccwpck_require__) => {
     const Agent = __nccwpck_require__(3465)
     const MockAgent = __nccwpck_require__(9457)
     const { SnapshotRecorder } = __nccwpck_require__(634)
@@ -76838,7 +76838,7 @@ plain-scalar(is-flow, min)
     /***/
   },
 
-  /***/ 9632: /***/ (__unused_webpack_module, exports, __nccwpck_require__) => {
+  /***/ 4870: /***/ (__unused_webpack_module, exports, __nccwpck_require__) => {
     var Scalar = __nccwpck_require__(5462)
     var map = __nccwpck_require__(34)
     var seq = __nccwpck_require__(6459)
@@ -76916,7 +76916,7 @@ plain-scalar(is-flow, min)
     var float = __nccwpck_require__(2984)
     var int = __nccwpck_require__(9879)
     var schema = __nccwpck_require__(9599)
-    var schema$1 = __nccwpck_require__(9632)
+    var schema$1 = __nccwpck_require__(4870)
     var binary = __nccwpck_require__(3148)
     var merge = __nccwpck_require__(2017)
     var omap = __nccwpck_require__(3112)
@@ -82737,10 +82737,10 @@ function getIDToken(aud) {
  */
 
 //# sourceMappingURL=core.js.map
-// EXTERNAL MODULE: ./node_modules/.pnpm/yaml@2.8.3/node_modules/yaml/dist/index.js
-var dist = __nccwpck_require__(7538)
 // EXTERNAL MODULE: ./node_modules/.pnpm/undici@8.1.0/node_modules/undici/index.js
-var node_modules_undici = __nccwpck_require__(1340) // CONCATENATED MODULE: ./src/utils.ts
+var node_modules_undici = __nccwpck_require__(1340)
+// EXTERNAL MODULE: ./node_modules/.pnpm/yaml@2.8.3/node_modules/yaml/dist/index.js
+var dist = __nccwpck_require__(7538) // CONCATENATED MODULE: ./src/utils.ts
 function pluralize(count) {
   return count === 1 ? '' : 's'
 } // CONCATENATED MODULE: ./src/linter.ts
@@ -87365,4 +87365,38 @@ async function run(core) {
 }
 /* harmony default export */ const src_run = run // CONCATENATED MODULE: ./src/index.ts
 
+// Set a retrying, proxy-aware global dispatcher for all fetch() calls.
+//
+// EnvHttpProxyAgent reads HTTP_PROXY / HTTPS_PROXY / NO_PROXY from the env so
+// runners behind a corporate proxy work without code changes.
+//
+// RetryAgent makes up to 5 total attempts on network errors and 5xx/429
+// responses, with 2x exponential backoff starting at 300ms (capped at 4s):
+//
+//   ├─ attempt 1   (immediate)
+//   │    wait 300ms
+//   ├─ attempt 2
+//   │    wait 600ms
+//   ├─ attempt 3
+//   │    wait 1.2s
+//   ├─ attempt 4
+//   │    wait 2.4s
+//   └─ attempt 5   → throw if still failing
+//
+//   ~4.5s of total backoff before giving up. 429 responses honor Retry-After.
+//
+// POST is added to the retried methods because undici excludes it by default;
+// it's safe here since the lint API is idempotent (same source → same result).
+;(0, node_modules_undici /* setGlobalDispatcher */.bj)(
+  new node_modules_undici /* RetryAgent */.cg(
+    new node_modules_undici /* EnvHttpProxyAgent */.J2(),
+    {
+      maxRetries: 4,
+      minTimeout: 300,
+      maxTimeout: 4000,
+      timeoutFactor: 2,
+      methods: ['POST', 'GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE', 'TRACE']
+    }
+  )
+)
 src_run(core_namespaceObject)
