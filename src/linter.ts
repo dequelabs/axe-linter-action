@@ -1,5 +1,6 @@
 import * as core from '@actions/core'
 import { readFileSync, statSync } from 'fs'
+import { fetch } from 'undici'
 import type { LinterResponse } from './types.ts'
 import { pluralize } from './utils.ts'
 

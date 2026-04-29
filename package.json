@@ -13,20 +13,20 @@
     "test": "node --experimental-test-module-mocks --experimental-config-file=node.config.json --test --experimental-test-coverage 'src/**/*.test.ts'"
   },
   "dependencies": {
-    "@actions/core": "^1.11.1",
-    "@actions/github": "^6.0.1",
+    "@actions/core": "^3.0.1",
+    "@actions/github": "^9.1.1",
+    "undici": "^8.1.0",
     "yaml": "^2.8.3"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.12.2",
     "@vercel/ncc": "^0.38.4",
-    "eslint": "^9.39.4",
+    "eslint": "^10.2.1",
     "globals": "^17.5.0",
-    "lint-staged": "^15.5.2",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.8.3",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.59.0",
-    "undici": "^7.25.0"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.0"
   }
 }
