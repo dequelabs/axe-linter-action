@@ -31,6 +31,12 @@ updates:
       default-days: 7
     commit-message:
       prefix: 'chore'
+    ignore:
+      # Pin @types/node to the major version of Node we run against. Minor
+      # and patch updates still flow through.
+      - dependency-name: '@types/node'
+        update-types:
+          - version-update:semver-major
     groups:
       npm-low-risk:
         update-types:
