@@ -4,5 +4,3 @@ cd "$(dirname -- "$0")/../."
 yarn build
 
 git add .
-
-lint-staged
