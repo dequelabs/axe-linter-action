@@ -38,7 +38,7 @@ export async function getChangedFiles(token: string): Promise<string[]> {
 
     const files = response.data.files
 
-    if (files && files.length >= 300) {
+    if (files && files.length > 300) {
       core.warning(
         'This push includes 300+ changed files. The GitHub API only returns the first 300 files for push events, so some files may not be linted.'
       )
