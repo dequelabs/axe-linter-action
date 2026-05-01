@@ -87261,20 +87261,27 @@ async function getChangedFiles(token) {
       base,
       head
     })
+    const files = response.data.files
+    if (files && files.length >= 300) {
+      warning(
+        'This push includes 300+ changed files. The GitHub API only returns the first 300 files for push events, so some files may not be linted.'
+      )
+    }
     return (
-      response.data.files
+      files
         ?.filter(
           (file) => file.status !== 'removed' && isSupportedFile(file.filename)
         )
         .map((file) => file.filename) || []
     )
   }
-  const response = await octokit.rest.pulls.listFiles({
+  const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
     owner: context.repo.owner,
     repo: context.repo.repo,
-    pull_number: context.payload.pull_request.number
+    pull_number: context.payload.pull_request.number,
+    per_page: 100
   })
-  return response.data
+  return files
     .filter(
       (file) => file.status !== 'removed' && isSupportedFile(file.filename)
     )

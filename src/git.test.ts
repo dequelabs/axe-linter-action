@@ -8,13 +8,16 @@ describe('git', () => {
   let mockContext: any
   let githubStub: any
   let debugStub: any
+  let warningStub: any
   let getChangedFiles: typeof import('./git.ts').getChangedFiles
 
   before(async () => {
     debugStub = mock.fn()
+    warningStub = mock.fn()
     githubStub = mock.fn()
 
     mockOctokit = {
+      paginate: mock.fn(() => Promise.resolve([])),
       rest: {
         repos: {
           compareCommits: mock.fn(() =>
@@ -38,7 +41,7 @@ describe('git', () => {
     githubStub.mock.mockImplementation(() => mockOctokit)
 
     mock.module('@actions/core', {
-      namedExports: { debug: debugStub }
+      namedExports: { debug: debugStub, warning: warningStub }
     })
 
     mock.module('@actions/github', {
@@ -54,9 +57,12 @@ describe('git', () => {
 
   beforeEach(() => {
     debugStub.mock.resetCalls()
+    warningStub.mock.resetCalls()
     githubStub.mock.resetCalls()
     githubStub.mock.mockImplementation(() => mockOctokit)
 
+    mockOctokit.paginate.mock.resetCalls()
+    mockOctokit.paginate.mock.mockImplementation(() => Promise.resolve([]))
     mockOctokit.rest.repos.compareCommits.mock.resetCalls()
     mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
       Promise.resolve({ data: { files: [] } })
@@ -84,8 +90,8 @@ describe('git', () => {
         { filename: 'test.tsx' }
       ]
 
-      mockOctokit.rest.pulls.listFiles.mock.mockImplementation(() =>
-        Promise.resolve({ data: mockFiles })
+      mockOctokit.paginate.mock.mockImplementation(() =>
+        Promise.resolve(mockFiles)
       )
 
       const result = await getChangedFiles(token)
@@ -95,12 +101,13 @@ describe('git', () => {
         'getOctokit should be called with correct token'
       )
       assert.ok(
-        wasCalledWith(mockOctokit.rest.pulls.listFiles, {
+        wasCalledWith(mockOctokit.paginate, mockOctokit.rest.pulls.listFiles, {
           owner: 'test-owner',
           repo: 'test-repo',
-          pull_number: 123
+          pull_number: 123,
+          per_page: 100
         }),
-        'listFiles should be called with correct parameters'
+        'paginate should be called with listFiles and correct parameters'
       )
 
       assert.deepEqual(
@@ -155,9 +162,7 @@ describe('git', () => {
     it('should handle empty file lists', async () => {
       mockContext.payload.pull_request = { number: 123 }
 
-      mockOctokit.rest.pulls.listFiles.mock.mockImplementation(() =>
-        Promise.resolve({ data: [] })
-      )
+      mockOctokit.paginate.mock.mockImplementation(() => Promise.resolve([]))
 
       const result = await getChangedFiles(token)
 
@@ -188,8 +193,8 @@ describe('git', () => {
         { filename: 'test.rb' }
       ]
 
-      mockOctokit.rest.pulls.listFiles.mock.mockImplementation(() =>
-        Promise.resolve({ data: mockFiles })
+      mockOctokit.paginate.mock.mockImplementation(() =>
+        Promise.resolve(mockFiles)
       )
 
       const result = await getChangedFiles(token)
@@ -202,9 +207,7 @@ describe('git', () => {
       mockContext.payload.pull_request = { number: 123 }
 
       const error = new Error('API Error')
-      mockOctokit.rest.pulls.listFiles.mock.mockImplementation(() =>
-        Promise.reject(error)
-      )
+      mockOctokit.paginate.mock.mockImplementation(() => Promise.reject(error))
 
       try {
         await getChangedFiles(token)
@@ -225,8 +228,8 @@ describe('git', () => {
         { filename: 'test.tsx', status: 'added' }
       ]
 
-      mockOctokit.rest.pulls.listFiles.mock.mockImplementation(() =>
-        Promise.resolve({ data: mockFiles })
+      mockOctokit.paginate.mock.mockImplementation(() =>
+        Promise.resolve(mockFiles)
       )
 
       const result = await getChangedFiles(token)
@@ -272,14 +275,56 @@ describe('git', () => {
         { filename: 'test5.js', status: 'changed' }
       ]
 
-      mockOctokit.rest.pulls.listFiles.mock.mockImplementation(() =>
-        Promise.resolve({ data: mockFiles })
+      mockOctokit.paginate.mock.mockImplementation(() =>
+        Promise.resolve(mockFiles)
       )
 
       const result = await getChangedFiles(token)
 
       assert.deepEqual(result, ['test1.js', 'test2.js', 'test3.js', 'test5.js'])
       assert.ok(!result.includes('test4.js'))
+    })
+
+    it('should warn when push returns 300 or more files', async () => {
+      mockContext.payload.before = 'old-sha'
+      mockContext.payload.after = 'new-sha'
+
+      const mockFiles = Array.from({ length: 300 }, (_, i) => ({
+        filename: `file${i}.js`,
+        status: 'added'
+      }))
+
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
+
+      await getChangedFiles(token)
+
+      assert.strictEqual(warningStub.mock.callCount(), 1)
+      assert.ok(
+        wasCalledWith(
+          warningStub,
+          'This push includes 300+ changed files. The GitHub API only returns the first 300 files for push events, so some files may not be linted.'
+        )
+      )
+    })
+
+    it('should not warn when push returns fewer than 300 files', async () => {
+      mockContext.payload.before = 'old-sha'
+      mockContext.payload.after = 'new-sha'
+
+      const mockFiles = Array.from({ length: 299 }, (_, i) => ({
+        filename: `file${i}.js`,
+        status: 'added'
+      }))
+
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
+
+      await getChangedFiles(token)
+
+      assert.strictEqual(warningStub.mock.callCount(), 0)
     })
   })
   describe('file pattern matching', () => {
