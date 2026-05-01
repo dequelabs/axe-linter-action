@@ -285,31 +285,7 @@ describe('git', () => {
       assert.ok(!result.includes('test4.js'))
     })
 
-    it('should warn when push returns more than 300 files', async () => {
-      mockContext.payload.before = 'old-sha'
-      mockContext.payload.after = 'new-sha'
-
-      const mockFiles = Array.from({ length: 301 }, (_, i) => ({
-        filename: `file${i}.js`,
-        status: 'added'
-      }))
-
-      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
-        Promise.resolve({ data: { files: mockFiles } })
-      )
-
-      await getChangedFiles(token)
-
-      assert.strictEqual(warningStub.mock.callCount(), 1)
-      assert.ok(
-        wasCalledWith(
-          warningStub,
-          'This push includes 300+ changed files. The GitHub API only returns the first 300 files for push events, so some files may not be linted.'
-        )
-      )
-    })
-
-    it('should not warn when push returns exactly 300 files', async () => {
+    it('should warn when push returns 300 or more files', async () => {
       mockContext.payload.before = 'old-sha'
       mockContext.payload.after = 'new-sha'
 
@@ -324,7 +300,13 @@ describe('git', () => {
 
       await getChangedFiles(token)
 
-      assert.strictEqual(warningStub.mock.callCount(), 0)
+      assert.strictEqual(warningStub.mock.callCount(), 1)
+      assert.ok(
+        wasCalledWith(
+          warningStub,
+          'This push changed at least 300 files. The GitHub API only returns up to the first 300 files for push events, so some files may not be linted.'
+        )
+      )
     })
 
     it('should not warn when push returns fewer than 300 files', async () => {

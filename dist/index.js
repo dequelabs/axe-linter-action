@@ -87262,9 +87262,9 @@ async function getChangedFiles(token) {
       head
     })
     const files = response.data.files
-    if (files && files.length > 300) {
+    if (files && files.length >= 300) {
       warning(
-        'This push includes 300+ changed files. The GitHub API only returns the first 300 files for push events, so some files may not be linted.'
+        'This push changed at least 300 files. The GitHub API only returns up to the first 300 files for push events, so some files may not be linted.'
       )
     }
     return (
