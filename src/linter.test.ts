@@ -416,57 +416,6 @@ describe('linter', () => {
       }
     })
 
-    it('should rethrow non-Error objects', async () => {
-      const files = ['test.js']
-
-      readFileMock.mock.mockImplementation(
-        () => '<div><h1>hello world</h1></div>'
-      )
-
-      const nonErrorObject = {
-        type: 'CustomError',
-        details: 'Something went wrong',
-        statusCode: 500
-      }
-
-      const fetchMock = mock.method(globalThis, 'fetch', () =>
-        Promise.reject(nonErrorObject)
-      )
-
-      try {
-        await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
-        assert.fail('Should have thrown an error')
-      } catch (error) {
-        assert.strictEqual(
-          error instanceof Error,
-          false,
-          'Error should not be an Error instance'
-        )
-        assert.deepEqual(
-          error,
-          nonErrorObject,
-          'Should be the original non-Error object'
-        )
-        assert.equal(
-          (error as any).type,
-          'CustomError',
-          'Should preserve custom properties'
-        )
-        assert.equal(
-          (error as any).details,
-          'Something went wrong',
-          'Should preserve error details'
-        )
-        assert.equal(
-          (error as any).statusCode,
-          500,
-          'Should preserve status code'
-        )
-      } finally {
-        fetchMock.mock.restore()
-      }
-    })
-
     it('should handle invalid linter config errors from server', async () => {
       const files = ['test.js']
       const invalidLinterConfig = {

@@ -1,4 +1,4 @@
-import type core from '@actions/core'
+import type * as core from '@actions/core'
 
 export type Core = Pick<
   typeof core,
