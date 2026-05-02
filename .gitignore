@@ -2,3 +2,6 @@ node_modules
 coverage
 .idea
 .claude/worktrees
+.pnpm-store/
+.DS_Store
+
