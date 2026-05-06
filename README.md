@@ -69,4 +69,4 @@ If there are more errors, they will not be reported. If you would like to view t
 
 Additional information can be found in [this GitHub discussion](https://github.com/orgs/community/discussions/26680).
 
-Individual files larger than 900 MB are skipped and logged as a warning. The axe-linter API has a 1 GB request size cap, so oversized files are filtered out pre-emptively to avoid 413 server request errors.
+Individual files larger than 900,000 bytes are skipped and logged as a warning. The axe-linter API has a 1 MB request size cap, so oversized files are filtered out pre-emptively to avoid 413 server request errors.

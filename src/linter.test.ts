@@ -262,7 +262,9 @@ describe('linter', () => {
     it('should skip files exceeding the size limit', async () => {
       const files = ['huge.js']
       statSyncMock.mock.mockImplementation((path: string) => {
-        if (path === 'huge.js') return { size: 900 * 1024 * 1024 + 1 }
+        if (path === 'huge.js') {
+          return { size: 900_001 }
+        }
         return { size: 100 }
       })
 
@@ -289,7 +291,7 @@ describe('linter', () => {
       )
       assert.match(
         warningStub.mock.calls[0].arguments[0],
-        /Skipping huge\.js: file size \(\d+ MB\) exceeds 900 MB limit/,
+        /Skipping huge\.js: file size \(\d+ bytes\) exceeds 900000 bytes limit/,
         'should log warning message about the oversized file'
       )
       assert.strictEqual(
