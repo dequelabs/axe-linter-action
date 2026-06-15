@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      - uses: dequelabs/axe-linter-action@v1
+      - uses: dequelabs/axe-linter-action@v1.3.0
         with:
           api_key: ${{ secrets.AXE_LINTER_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -52,7 +52,7 @@ jobs:
       pull-requests: read # Required to read the pull request
     steps:
       - uses: actions/checkout@v6
-      - uses: dequelabs/axe-linter-action@v1
+      - uses: dequelabs/axe-linter-action@v1.3.0
         with:
           api_key: ${{ secrets.AXE_LINTER_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
