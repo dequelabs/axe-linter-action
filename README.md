@@ -32,7 +32,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read # Required to check out repository files and compare commits on push events
+      contents: read # Required to check out the repository
       pull-requests: read # Required to read the pull request
     steps:
       - name: Checkout Repository
