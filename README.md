@@ -32,11 +32,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read # Required to read the contents of the pull request
+      contents: read # Required to check out repository files and compare commits on push events
       pull-requests: read # Required to read the pull request
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@<commit-sha> # v6.0.2
       - name: Run Axe Linter
         uses: dequelabs/axe-linter-action@<commit-sha> # v2.x.y
         with:
@@ -46,7 +46,7 @@ jobs:
 
 ## Pinning the action version
 
-The examples above pin the action to a full-length commit SHA, with a trailing
+The example above pins each action to a full-length commit SHA, with a trailing
 comment noting the human-readable version it corresponds to. This is the
 recommended approach for supply-chain safety — the action you run can never
 change underneath you:

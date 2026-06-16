@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file. See [commit
 
 ### Features
 
-- Work behind corporate proxies and recover from transient failures. Requests to the axe-linter API now honor `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY` and automatically retry on network errors and 408/429/5xx responses with exponential backoff ([#115](https://github.com/dequelabs/axe-linter-action/issues/115)) ([5b075f3](https://github.com/dequelabs/axe-linter-action/commit/5b075f32ec91d58fd201b67bc4fb02010f3c4d2d)).
+- Work behind corporate proxies and recover from transient failures. Requests to the axe-linter API now honor `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY` and automatically retry on network errors and 408/429/500/502/503/504 responses with exponential backoff ([#115](https://github.com/dequelabs/axe-linter-action/issues/115)) ([5b075f3](https://github.com/dequelabs/axe-linter-action/commit/5b075f32ec91d58fd201b67bc4fb02010f3c4d2d)).
 - Lint Liquid templates. `.liquid` files are now recognized and sent to the linter ([#95](https://github.com/dequelabs/axe-linter-action/issues/95)) ([fae620d](https://github.com/dequelabs/axe-linter-action/commit/fae620d841fb8e6fdb5029550bc475a62e53c30a)).
 
 ### Bug Fixes
