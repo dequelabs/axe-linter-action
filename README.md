@@ -55,11 +55,12 @@ change underneath you:
 - uses: dequelabs/axe-linter-action@<commit-sha> # v2.x.y
 ```
 
-Replace `<commit-sha>` with the SHA for the release you want from the
+Replace each `<commit-sha>` with a SHA from that action's own releases or
+tags page — for axe-linter-action, its
 [releases](https://github.com/dequelabs/axe-linter-action/releases) or
-[tags](https://github.com/dequelabs/axe-linter-action/tags) page, and let
+[tags](https://github.com/dequelabs/axe-linter-action/tags) page — and let
 [Dependabot](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/keeping-your-actions-up-to-date-with-dependabot)
-keep the pin up to date for you.
+keep the pins up to date for you.
 
 ## Limitation
 
