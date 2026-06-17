@@ -21,42 +21,46 @@ Create a file in your repository called `.github/workflows/axe-linter.yml` with 
 ```yaml
 name: Lint for accessibility issues
 
-on: [pull_request]
+on:
+  - pull_request
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dequelabs/axe-linter-action@v1
-        with:
-          api_key: ${{ secrets.AXE_LINTER_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-```
-
-## Example Usage for private repository.
-
-Create a file in your repository called `.github/workflows/axe-linter.yml` with the following contents:
-
-```yaml
-name: Lint for accessibility issues
-
-on: [pull_request]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true # Cancel things if new events come in to conserve resources.
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read # Required to read the contents of the pull request
+      contents: read # Required to check out the repository
       pull-requests: read # Required to read the pull request
     steps:
-      - uses: actions/checkout@v6
-      - uses: dequelabs/axe-linter-action@v1
+      - name: Checkout Repository
+        uses: actions/checkout@<commit-sha> # v6.0.2
+      - name: Run Axe Linter
+        uses: dequelabs/axe-linter-action@<commit-sha> # v2.x.y
         with:
           api_key: ${{ secrets.AXE_LINTER_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+## Pinning the action version
+
+The example above pins each action to a full-length commit SHA, with a trailing
+comment noting the human-readable version it corresponds to. This is the
+recommended approach for supply-chain safety — the action you run can never
+change underneath you:
+
+```yaml
+- uses: dequelabs/axe-linter-action@<commit-sha> # v2.x.y
+```
+
+Replace each `<commit-sha>` with a SHA from that action's own releases or
+tags page — for axe-linter-action, its
+[releases](https://github.com/dequelabs/axe-linter-action/releases) or
+[tags](https://github.com/dequelabs/axe-linter-action/tags) page — and let
+[Dependabot](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/keeping-your-actions-up-to-date-with-dependabot)
+keep the pins up to date for you.
 
 ## Limitation
 
