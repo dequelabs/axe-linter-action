@@ -18,6 +18,9 @@ describe('git', () => {
 
     mockOctokit = {
       paginate: mock.fn(() => Promise.resolve([])),
+      graphql: mock.fn(() =>
+        Promise.resolve({ repository: { refs: { nodes: [] } } })
+      ),
       rest: {
         repos: {
           compareCommits: mock.fn(() =>
@@ -35,6 +38,8 @@ describe('git', () => {
         owner: 'test-owner',
         repo: 'test-repo'
       },
+      eventName: 'push',
+      ref: 'refs/heads/main',
       payload: {}
     }
 
@@ -63,6 +68,10 @@ describe('git', () => {
 
     mockOctokit.paginate.mock.resetCalls()
     mockOctokit.paginate.mock.mockImplementation(() => Promise.resolve([]))
+    mockOctokit.graphql.mock.resetCalls()
+    mockOctokit.graphql.mock.mockImplementation(() =>
+      Promise.resolve({ repository: { refs: { nodes: [] } } })
+    )
     mockOctokit.rest.repos.compareCommits.mock.resetCalls()
     mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
       Promise.resolve({ data: { files: [] } })
@@ -72,6 +81,8 @@ describe('git', () => {
       Promise.resolve({ data: [] })
     )
 
+    mockContext.eventName = 'push'
+    mockContext.ref = 'refs/heads/main'
     mockContext.payload = {}
   })
 
@@ -327,6 +338,261 @@ describe('git', () => {
       assert.strictEqual(warningStub.mock.callCount(), 0)
     })
   })
+
+  describe('tag events', () => {
+    it('should compare a new tag against the previous tag (push event)', async () => {
+      mockContext.ref = 'refs/tags/v2.0.0'
+      mockContext.payload.before = '0000000000000000000000000000000000000000'
+      mockContext.payload.after = 'tag-sha'
+
+      mockOctokit.graphql.mock.mockImplementation(() =>
+        Promise.resolve({
+          repository: {
+            refs: {
+              nodes: [
+                { name: 'v2.0.0' },
+                { name: 'v1.5.0' },
+                { name: 'v1.0.0' }
+              ]
+            }
+          }
+        })
+      )
+
+      const mockFiles = [
+        { filename: 'src/app.js', status: 'modified' },
+        { filename: 'docs/guide.md', status: 'added' },
+        { filename: 'old.js', status: 'removed' }
+      ]
+
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
+
+      const result = await getChangedFiles(token)
+
+      assert.ok(
+        wasCalledWith(mockOctokit.rest.repos.compareCommits, {
+          owner: 'test-owner',
+          repo: 'test-repo',
+          base: 'v1.5.0',
+          head: 'v2.0.0'
+        }),
+        'compareCommits should be called with the previous and current tags'
+      )
+
+      assert.deepEqual(result, ['src/app.js', 'docs/guide.md'])
+      assert.ok(!result.includes('old.js'))
+    })
+
+    it('should handle a create event for a new tag', async () => {
+      mockContext.eventName = 'create'
+      mockContext.ref = 'refs/heads/main'
+      mockContext.payload.ref = 'v3.0.0'
+      mockContext.payload.ref_type = 'tag'
+
+      mockOctokit.graphql.mock.mockImplementation(() =>
+        Promise.resolve({
+          repository: {
+            refs: {
+              nodes: [{ name: 'v3.0.0' }, { name: 'v2.0.0' }]
+            }
+          }
+        })
+      )
+
+      const mockFiles = [{ filename: 'src/index.html', status: 'added' }]
+
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
+
+      const result = await getChangedFiles(token)
+
+      assert.ok(
+        wasCalledWith(mockOctokit.rest.repos.compareCommits, {
+          owner: 'test-owner',
+          repo: 'test-repo',
+          base: 'v2.0.0',
+          head: 'v3.0.0'
+        })
+      )
+
+      assert.deepEqual(result, ['src/index.html'])
+    })
+
+    it('should sort tags chronologically, not lexically (v10 vs v2)', async () => {
+      mockContext.ref = 'refs/tags/v10.0.0'
+
+      mockOctokit.graphql.mock.mockImplementation(() =>
+        Promise.resolve({
+          repository: {
+            refs: {
+              nodes: [
+                { name: 'v10.0.0' },
+                { name: 'v9.0.0' },
+                { name: 'v2.0.0' }
+              ]
+            }
+          }
+        })
+      )
+
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: [] } })
+      )
+
+      await getChangedFiles(token)
+
+      assert.ok(
+        wasCalledWith(mockOctokit.rest.repos.compareCommits, {
+          owner: 'test-owner',
+          repo: 'test-repo',
+          base: 'v9.0.0',
+          head: 'v10.0.0'
+        })
+      )
+    })
+
+    it('should return empty array when no previous tag exists', async () => {
+      mockContext.ref = 'refs/tags/v1.0.0'
+
+      mockOctokit.graphql.mock.mockImplementation(() =>
+        Promise.resolve({
+          repository: { refs: { nodes: [{ name: 'v1.0.0' }] } }
+        })
+      )
+
+      const result = await getChangedFiles(token)
+
+      assert.deepEqual(result, [])
+      assert.strictEqual(
+        mockOctokit.rest.repos.compareCommits.mock.callCount(),
+        0,
+        'should not call compareCommits when there is no previous tag'
+      )
+      assert.ok(
+        wasCalledWith(debugStub, 'No previous tag found, nothing to lint')
+      )
+    })
+
+    it('should return empty array when there are no tags at all', async () => {
+      mockContext.ref = 'refs/tags/v1.0.0'
+
+      mockOctokit.graphql.mock.mockImplementation(() =>
+        Promise.resolve({ repository: { refs: { nodes: [] } } })
+      )
+
+      const result = await getChangedFiles(token)
+
+      assert.deepEqual(result, [])
+      assert.strictEqual(
+        mockOctokit.rest.repos.compareCommits.mock.callCount(),
+        0
+      )
+    })
+
+    it('should fall back to most recent tag when current tag is outside the most-recent 100', async () => {
+      mockContext.ref = 'refs/tags/v0.0.1-old'
+
+      mockOctokit.graphql.mock.mockImplementation(() =>
+        Promise.resolve({
+          repository: {
+            refs: {
+              nodes: [{ name: 'v3.0.0' }, { name: 'v2.0.0' }]
+            }
+          }
+        })
+      )
+
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: [] } })
+      )
+
+      await getChangedFiles(token)
+
+      assert.ok(
+        wasCalledWith(mockOctokit.rest.repos.compareCommits, {
+          owner: 'test-owner',
+          repo: 'test-repo',
+          base: 'v3.0.0',
+          head: 'v0.0.1-old'
+        })
+      )
+    })
+
+    it('should warn when tag diff returns 300 or more files', async () => {
+      mockContext.ref = 'refs/tags/v2.0.0'
+
+      mockOctokit.graphql.mock.mockImplementation(() =>
+        Promise.resolve({
+          repository: {
+            refs: { nodes: [{ name: 'v2.0.0' }, { name: 'v1.0.0' }] }
+          }
+        })
+      )
+
+      const mockFiles = Array.from({ length: 300 }, (_, i) => ({
+        filename: `file${i}.js`,
+        status: 'added'
+      }))
+
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: mockFiles } })
+      )
+
+      await getChangedFiles(token)
+
+      assert.strictEqual(warningStub.mock.callCount(), 1)
+      assert.ok(
+        wasCalledWith(
+          warningStub,
+          'This tag changed at least 300 files. The GitHub API only returns up to the first 300 files when comparing commits, so some files may not be linted.'
+        )
+      )
+    })
+
+    it('should query GraphQL with owner and repo', async () => {
+      mockContext.ref = 'refs/tags/v2.0.0'
+
+      mockOctokit.graphql.mock.mockImplementation(() =>
+        Promise.resolve({
+          repository: {
+            refs: { nodes: [{ name: 'v2.0.0' }, { name: 'v1.0.0' }] }
+          }
+        })
+      )
+
+      await getChangedFiles(token)
+
+      const call = mockOctokit.graphql.mock.calls[0]
+      assert.ok(call, 'graphql should have been called')
+      assert.deepEqual(call.arguments[1], {
+        owner: 'test-owner',
+        repo: 'test-repo'
+      })
+    })
+
+    it('should not treat a regular branch push as a tag event', async () => {
+      mockContext.ref = 'refs/heads/main'
+      mockContext.payload.before = 'old-sha'
+      mockContext.payload.after = 'new-sha'
+
+      mockOctokit.rest.repos.compareCommits.mock.mockImplementation(() =>
+        Promise.resolve({ data: { files: [{ filename: 'src/app.js' }] } })
+      )
+
+      const result = await getChangedFiles(token)
+
+      assert.strictEqual(
+        mockOctokit.graphql.mock.callCount(),
+        0,
+        'graphql should not be called for branch pushes'
+      )
+      assert.deepEqual(result, ['src/app.js'])
+    })
+  })
+
   describe('file pattern matching', () => {
     it('should match JavaScript files correctly', async () => {
       const mockFiles = [

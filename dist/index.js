@@ -88398,6 +88398,7 @@ const FILE_EXTENSIONS = new Set([
   '.markdown',
   '.liquid'
 ])
+const TAG_REF_PREFIX = 'refs/tags/'
 function isSupportedFile(filename) {
   const hasDotSegment = filename.split('/').some((seg) => seg.startsWith('.'))
   return (
@@ -88407,37 +88408,46 @@ function isSupportedFile(filename) {
     )
   )
 }
-async function getChangedFiles(token) {
-  const octokit = getOctokit(token)
+function getPushedTagName() {
   const { /* context */ _: context } = github_namespaceObject
-  if (!context.payload.pull_request) {
-    debug('Not a pull request, checking push diff')
-    const base = context.payload.before
-    const head = context.payload.after
-    const response = await octokit.rest.repos.compareCommits({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      base,
-      head
-    })
-    const files = response.data.files
-    if (files && files.length >= 300) {
-      warning(
-        'This push changed at least 300 files. The GitHub API only returns up to the first 300 files for push events, so some files may not be linted.'
-      )
-    }
-    return (
-      files
-        ?.filter(
-          (file) => file.status !== 'removed' && isSupportedFile(file.filename)
-        )
-        .map((file) => file.filename) || []
-    )
+  if (context.ref?.startsWith(TAG_REF_PREFIX)) {
+    return context.ref.slice(TAG_REF_PREFIX.length)
   }
+  if (
+    context.eventName === 'create' &&
+    context.payload.ref_type === 'tag' &&
+    typeof context.payload.ref === 'string'
+  ) {
+    return context.payload.ref
+  }
+  return null
+}
+async function getPreviousTagName(octokit, owner, repo, currentTag) {
+  // REST listTags returns alphabetical order, so v10 sorts before v2.
+  // GraphQL with TAG_COMMIT_DATE gives a chronological list we can scan.
+  const result = await octokit.graphql(
+    `query($owner: String!, $repo: String!) {
+      repository(owner: $owner, name: $repo) {
+        refs(refPrefix: "refs/tags/", first: 100, orderBy: { field: TAG_COMMIT_DATE, direction: DESC }) {
+          nodes { name }
+        }
+      }
+    }`,
+    { owner, repo }
+  )
+  const names = result.repository?.refs?.nodes?.map((node) => node.name) ?? []
+  const currentIndex = names.indexOf(currentTag)
+  if (currentIndex === -1) {
+    return names[0] ?? null
+  }
+  return names[currentIndex + 1] ?? null
+}
+async function getPullRequestFiles(octokit, pullNumber) {
+  const { /* context */ _: context } = github_namespaceObject
   const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
     owner: context.repo.owner,
     repo: context.repo.repo,
-    pull_number: context.payload.pull_request.number,
+    pull_number: pullNumber,
     per_page: 100
   })
   return files
@@ -88445,6 +88455,75 @@ async function getChangedFiles(token) {
       (file) => file.status !== 'removed' && isSupportedFile(file.filename)
     )
     .map((file) => file.filename)
+}
+async function getTagFiles(octokit, tagName) {
+  const { /* context */ _: context } = github_namespaceObject
+  debug(`Tag event for ${tagName}, finding previous tag for diff`)
+  const previousTag = await getPreviousTagName(
+    octokit,
+    context.repo.owner,
+    context.repo.repo,
+    tagName
+  )
+  if (!previousTag) {
+    debug('No previous tag found, nothing to lint')
+    return []
+  }
+  debug(`Comparing ${previousTag}...${tagName}`)
+  const response = await octokit.rest.repos.compareCommits({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    base: previousTag,
+    head: tagName
+  })
+  const files = response.data.files
+  if (files && files.length >= 300) {
+    warning(
+      'This tag changed at least 300 files. The GitHub API only returns up to the first 300 files when comparing commits, so some files may not be linted.'
+    )
+  }
+  return (
+    files
+      ?.filter(
+        (file) => file.status !== 'removed' && isSupportedFile(file.filename)
+      )
+      .map((file) => file.filename) || []
+  )
+}
+async function getPushFiles(octokit) {
+  const { /* context */ _: context } = github_namespaceObject
+  debug('Not a pull request, checking push diff')
+  const response = await octokit.rest.repos.compareCommits({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    base: context.payload.before,
+    head: context.payload.after
+  })
+  const files = response.data.files
+  if (files && files.length >= 300) {
+    warning(
+      'This push changed at least 300 files. The GitHub API only returns up to the first 300 files for push events, so some files may not be linted.'
+    )
+  }
+  return (
+    files
+      ?.filter(
+        (file) => file.status !== 'removed' && isSupportedFile(file.filename)
+      )
+      .map((file) => file.filename) || []
+  )
+}
+async function getChangedFiles(token) {
+  const octokit = getOctokit(token)
+  const { /* context */ _: context } = github_namespaceObject
+  if (context.payload.pull_request) {
+    return getPullRequestFiles(octokit, context.payload.pull_request.number)
+  }
+  const tagName = getPushedTagName()
+  if (tagName) {
+    return getTagFiles(octokit, tagName)
+  }
+  return getPushFiles(octokit)
 } // CONCATENATED MODULE: ./src/run.ts
 
 function getOnlyFiles() {
