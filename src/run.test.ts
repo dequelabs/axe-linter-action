@@ -1,8 +1,33 @@
 import { describe, it, before, beforeEach, after, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import { stringify } from 'yaml'
-import type { Core } from './types.ts'
+import type { Core, LintSummary, LinterError } from './types.ts'
 import { wasCalledWith } from './test-utils.ts'
+
+function emptySummary(): LintSummary {
+  return { results: [], totalErrors: 0 }
+}
+
+function mkError(overrides: Partial<LinterError> = {}): LinterError {
+  return {
+    ruleId: 'test-rule',
+    lineNumber: 1,
+    column: 1,
+    endColumn: 2,
+    description: 'Test issue',
+    helpURL: 'https://example.com/rule',
+    ...overrides
+  }
+}
+
+function lintSummary(files: string[], errorsPerFile: number): LintSummary {
+  const results = files.map((file) => ({
+    file,
+    status: 'linted' as const,
+    errors: Array.from({ length: errorsPerFile }, () => mkError())
+  }))
+  return { results, totalErrors: files.length * errorsPerFile }
+}
 
 describe('run', () => {
   let run: typeof import('./run.ts').default
@@ -18,6 +43,8 @@ describe('run', () => {
   let statSyncMock: any
   let getChangedFilesMock: any
   let lintFilesMock: any
+  let summaryAddRawMock: any
+  let summaryWriteMock: any
 
   before(async () => {
     getInputMock = mock.fn(() => '')
@@ -30,7 +57,9 @@ describe('run', () => {
     globSyncMock = mock.fn(() => [])
     statSyncMock = mock.fn(() => ({ isFile: () => true }))
     getChangedFilesMock = mock.fn(() => Promise.resolve([]))
-    lintFilesMock = mock.fn(() => Promise.resolve(0))
+    lintFilesMock = mock.fn(() => Promise.resolve(emptySummary()))
+    summaryAddRawMock = mock.fn()
+    summaryWriteMock = mock.fn(() => Promise.resolve())
 
     mock.module('fs', {
       namedExports: {
@@ -68,15 +97,22 @@ describe('run', () => {
     getChangedFilesMock.mock.resetCalls()
     getChangedFilesMock.mock.mockImplementation(() => Promise.resolve([]))
     lintFilesMock.mock.resetCalls()
-    lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
+    lintFilesMock.mock.mockImplementation(() => Promise.resolve(emptySummary()))
+    summaryAddRawMock.mock.resetCalls()
+    summaryWriteMock.mock.resetCalls()
+    summaryWriteMock.mock.mockImplementation(() => Promise.resolve())
 
     mockCore = {
       getInput: getInputMock,
       setFailed: setFailedMock,
       info: infoMock,
       debug: debugMock,
-      setOutput: setOutputMock
+      setOutput: setOutputMock,
+      summary: { addRaw: summaryAddRawMock, write: summaryWriteMock }
     } as unknown as Core
+
+    // addRaw is chainable in production (returns the summary singleton).
+    summaryAddRawMock.mock.mockImplementation(() => mockCore.summary)
 
     delete process.env.AXE_LINTER_ONLY
   })
@@ -114,7 +150,9 @@ describe('run', () => {
       return ''
     })
 
-    lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
+    lintFilesMock.mock.mockImplementation(() =>
+      Promise.resolve(lintSummary(['test.js', 'test.html'], 0))
+    )
 
     await run(mockCore)
 
@@ -133,6 +171,13 @@ describe('run', () => {
     )
 
     assert.strictEqual(setFailedMock.mock.callCount(), 0)
+
+    // A results summary is written even on a clean pass.
+    assert.strictEqual(summaryWriteMock.mock.callCount(), 1)
+    assert.match(
+      summaryAddRawMock.mock.calls[0].arguments[0],
+      /No accessibility issues found/
+    )
   })
 
   it('should handle no changed files', async () => {
@@ -162,6 +207,13 @@ describe('run', () => {
       0,
       'Should not attempt to read any files'
     )
+
+    assert.ok(
+      summaryAddRawMock.mock.calls.some((c: any) =>
+        /No files to lint/.test(c.arguments[0])
+      ),
+      'Should write a "no files to lint" summary'
+    )
   })
 
   it('should handle missing config file', async () => {
@@ -176,7 +228,7 @@ describe('run', () => {
       return ''
     })
 
-    lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
+    lintFilesMock.mock.mockImplementation(() => Promise.resolve(emptySummary()))
 
     await run(mockCore)
 
@@ -217,7 +269,9 @@ describe('run', () => {
       return ''
     })
 
-    lintFilesMock.mock.mockImplementation(() => Promise.resolve(2))
+    lintFilesMock.mock.mockImplementation(() =>
+      Promise.resolve(lintSummary(['test.js'], 2))
+    )
 
     await run(mockCore)
 
@@ -236,11 +290,86 @@ describe('run', () => {
       return ''
     })
 
-    lintFilesMock.mock.mockImplementation(() => Promise.resolve(1))
+    lintFilesMock.mock.mockImplementation(() =>
+      Promise.resolve(lintSummary(['test.js'], 1))
+    )
 
     await run(mockCore)
 
     assert.ok(wasCalledWith(setFailedMock, 'Found 1 accessibility issue'))
+  })
+
+  it('should write a results summary listing findings', async () => {
+    setupInputs({ axe_linter_url: 'https://test-linter.com' })
+
+    getChangedFilesMock.mock.mockImplementation(() =>
+      Promise.resolve(['test.js'])
+    )
+    readFileMock.mock.mockImplementation((path: string) => {
+      if (path === 'axe-linter.yml') throw new Error('ENOENT')
+      return ''
+    })
+    lintFilesMock.mock.mockImplementation(() =>
+      Promise.resolve(lintSummary(['test.js'], 2))
+    )
+
+    await run(mockCore)
+
+    assert.strictEqual(summaryWriteMock.mock.callCount(), 1)
+    const markdown = summaryAddRawMock.mock.calls[0].arguments[0]
+    assert.match(markdown, /Axe Linter results/)
+    assert.match(markdown, /Found 2 accessibility issues/)
+    // The findings themselves must reach a rendered table row, not just the count.
+    assert.match(markdown, /#### <code>test\.js<\/code>/)
+    assert.match(markdown, /\| Line \| Rule \| Issue \| Help \|/)
+    assert.match(markdown, /<code>test-rule<\/code>/)
+    assert.match(markdown, /Test issue/)
+    assert.ok(wasCalledWith(setFailedMock, 'Found 2 accessibility issues'))
+  })
+
+  it('should write an error summary when the run aborts', async () => {
+    setupInputs({ axe_linter_url: 'https://test-linter.com' })
+
+    getChangedFilesMock.mock.mockImplementation(() =>
+      Promise.reject(new Error('Git error'))
+    )
+
+    await run(mockCore)
+
+    assert.ok(wasCalledWith(setFailedMock, 'Git error'))
+    assert.strictEqual(summaryWriteMock.mock.callCount(), 1)
+    const markdown = summaryAddRawMock.mock.calls[0].arguments[0]
+    assert.match(markdown, /Axe Linter did not finish/)
+    assert.match(markdown, /Git error/)
+  })
+
+  it('should not fail the action when the step summary cannot be written', async () => {
+    setupInputs({ axe_linter_url: 'https://test-linter.com' })
+
+    getChangedFilesMock.mock.mockImplementation(() =>
+      Promise.resolve(['test.js'])
+    )
+    readFileMock.mock.mockImplementation((path: string) => {
+      if (path === 'axe-linter.yml') throw new Error('ENOENT')
+      return ''
+    })
+    lintFilesMock.mock.mockImplementation(() =>
+      Promise.resolve(lintSummary(['test.js'], 2))
+    )
+    summaryWriteMock.mock.mockImplementation(() =>
+      Promise.reject(new Error('no summary file'))
+    )
+
+    await run(mockCore)
+
+    // The action still reports the real result; the write failure is swallowed.
+    assert.ok(wasCalledWith(setFailedMock, 'Found 2 accessibility issues'))
+    assert.ok(
+      debugMock.mock.calls.some((c: any) =>
+        /Unable to write step summary/.test(c.arguments[0])
+      ),
+      'Should log a debug message when the summary write fails'
+    )
   })
 
   it('should handle missing required inputs', async () => {
@@ -297,7 +426,9 @@ describe('run', () => {
         if (path === 'axe-linter.yml') throw new Error('ENOENT')
         return ''
       })
-      lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
+      lintFilesMock.mock.mockImplementation(() =>
+        Promise.resolve(emptySummary())
+      )
 
       await run(mockCore)
 
@@ -324,7 +455,9 @@ describe('run', () => {
         if (path === 'axe-linter.yml') throw new Error('ENOENT')
         return ''
       })
-      lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
+      lintFilesMock.mock.mockImplementation(() =>
+        Promise.resolve(emptySummary())
+      )
 
       await run(mockCore)
 
@@ -345,7 +478,9 @@ describe('run', () => {
         if (path === 'axe-linter.yml') throw new Error('ENOENT')
         return ''
       })
-      lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
+      lintFilesMock.mock.mockImplementation(() =>
+        Promise.resolve(emptySummary())
+      )
 
       await run(mockCore)
 
@@ -371,7 +506,9 @@ describe('run', () => {
         if (path === 'axe-linter.yml') throw new Error('ENOENT')
         return ''
       })
-      lintFilesMock.mock.mockImplementation(() => Promise.resolve(0))
+      lintFilesMock.mock.mockImplementation(() =>
+        Promise.resolve(emptySummary())
+      )
 
       await run(mockCore)
 
