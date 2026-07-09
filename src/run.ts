@@ -2,8 +2,27 @@ import { readFileSync, globSync, statSync } from 'fs'
 import { parse } from 'yaml'
 import { lintFiles } from './linter.ts'
 import { getChangedFiles } from './git.ts'
-import type { Core, ActionInputs } from './types.ts'
+import { buildSummaryMarkdown, buildErrorSummaryMarkdown } from './summary.ts'
+import type { Core, ActionInputs, LintSummary } from './types.ts'
 import { pluralize } from './utils.ts'
+
+/**
+ * Write markdown to the GitHub step summary. Failures (e.g. running outside
+ * Actions, where `$GITHUB_STEP_SUMMARY` is unset) are swallowed so reporting
+ * can never change the action's pass/fail outcome or mask the real error.
+ */
+async function writeStepSummary(core: Core, markdown: string): Promise<void> {
+  try {
+    core.summary.addRaw(markdown, true)
+    await core.summary.write()
+  } catch (error) {
+    core.debug(
+      `Unable to write step summary: ${
+        error instanceof Error ? error.message : error
+      }`
+    )
+  }
+}
 
 export function getOnlyFiles(): string[] {
   /**
@@ -47,6 +66,10 @@ async function run(core: Core): Promise<void> {
 
     if (filesToLint.length === 0) {
       core.debug('No files to lint')
+      await writeStepSummary(
+        core,
+        buildSummaryMarkdown({ results: [], totalErrors: 0 })
+      )
       return
     }
 
@@ -72,24 +95,30 @@ async function run(core: Core): Promise<void> {
     }
 
     // Run linter
-    const errorCount = await lintFiles(
+    const summary: LintSummary = await lintFiles(
       filesToLint,
       inputs.apiKey,
       inputs.axeLinterUrl,
       linterConfig
     )
 
-    if (errorCount > 0) {
+    await writeStepSummary(core, buildSummaryMarkdown(summary))
+
+    if (summary.totalErrors > 0) {
       core.setFailed(
-        `Found ${errorCount} accessibility issue${pluralize(errorCount)}`
+        `Found ${summary.totalErrors} accessibility issue${pluralize(
+          summary.totalErrors
+        )}`
       )
     }
   } catch (error) {
-    if (error instanceof Error) {
-      core.setFailed(error.message)
-    } else {
-      core.setFailed('An unexpected error occurred: ' + JSON.stringify(error))
-    }
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'An unexpected error occurred: ' + JSON.stringify(error)
+
+    await writeStepSummary(core, buildErrorSummaryMarkdown(message))
+    core.setFailed(message)
   }
 }
 

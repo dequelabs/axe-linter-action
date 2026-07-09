@@ -158,14 +158,28 @@ describe('linter', () => {
           })
       })
 
-      const errorCount = await lintFiles(
-        files,
-        apiKey,
-        axeLinterUrl,
-        linterConfig
-      )
+      const result = await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
 
-      assert.equal(errorCount, 2, 'should return correct total error count')
+      assert.equal(
+        result.totalErrors,
+        2,
+        'should return correct total error count'
+      )
+      assert.equal(
+        result.results.length,
+        2,
+        'should collect a result per linted file'
+      )
+      assert.ok(
+        result.results.every((r) => r.status === 'linted'),
+        'both files should be marked as linted'
+      )
+      // The collected errors payload — not just the count — drives the summary.
+      assert.deepEqual(
+        result.results.map((r) => r.errors.map((e) => e.ruleId)),
+        [['test-rule-1'], ['test-rule-2']],
+        "should keep each file's collected errors"
+      )
       assert.equal(errorStub.mock.callCount(), 2, 'should report each error')
 
       assert.ok(
@@ -222,14 +236,13 @@ describe('linter', () => {
         { headers: { 'content-type': 'application/json' } }
       )
 
-      const errorCount = await lintFiles(
-        files,
-        apiKey,
-        axeLinterUrl,
-        linterConfig
-      )
+      const result = await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
 
-      assert.equal(errorCount, 1, 'should return one error for single file')
+      assert.equal(
+        result.totalErrors,
+        1,
+        'should return one error for single file'
+      )
       mockAgent.assertNoPendingInterceptors()
     })
 
@@ -241,14 +254,18 @@ describe('linter', () => {
         .intercept({ path: '/lint-source', method: 'POST' })
         .reply(200, {})
 
-      const errorCount = await lintFiles(
-        files,
-        apiKey,
-        axeLinterUrl,
-        linterConfig
-      )
+      const result = await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
 
-      assert.equal(errorCount, 0, 'should return zero errors for empty files')
+      assert.equal(
+        result.totalErrors,
+        0,
+        'should return zero errors for empty files'
+      )
+      assert.equal(
+        result.results[0].status,
+        'skipped-empty',
+        'should record the empty file as skipped'
+      )
       assert.ok(
         wasCalledWith(debugStub, 'Skipping empty file empty.js'),
         'should log debug message'
@@ -272,17 +289,22 @@ describe('linter', () => {
         .intercept({ path: '/lint-source', method: 'POST' })
         .reply(200, {})
 
-      const errorCount = await lintFiles(
-        files,
-        apiKey,
-        axeLinterUrl,
-        linterConfig
-      )
+      const result = await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
 
       assert.equal(
-        errorCount,
+        result.totalErrors,
         0,
         'should return zero errors for oversized files'
+      )
+      assert.equal(
+        result.results[0].status,
+        'skipped-oversized',
+        'should record the oversized file as skipped'
+      )
+      assert.equal(
+        result.results[0].sizeBytes,
+        900_001,
+        'should record the oversized file size'
       )
       assert.strictEqual(
         warningStub.mock.callCount(),
@@ -391,6 +413,27 @@ describe('linter', () => {
         assert.fail('should have thrown an error')
       } catch (error) {
         assert.ok(error instanceof Error)
+        mockAgent.assertNoPendingInterceptors()
+      }
+    })
+
+    it('should throw a detailed error for a non-JSON content type', async () => {
+      const files = ['test.js']
+      readFileMock.mock.mockImplementation(() => '<div>hi</div>')
+
+      mockPool
+        .intercept({ path: '/lint-source', method: 'POST' })
+        .reply(200, '<html>not json</html>', {
+          headers: { 'content-type': 'text/html' }
+        })
+
+      try {
+        await lintFiles(files, apiKey, axeLinterUrl, linterConfig)
+        assert.fail('should have thrown an error')
+      } catch (error) {
+        assert.ok(error instanceof Error)
+        assert.match(error.message, /Invalid content type/)
+        assert.match(error.message, /text\/html/)
         mockAgent.assertNoPendingInterceptors()
       }
     })

@@ -1,7 +1,7 @@
 import * as core from '@actions/core'
 import { readFileSync, statSync } from 'fs'
 import { fetch } from 'undici'
-import type { LinterResponse } from './types.ts'
+import type { LinterResponse, FileResult, LintSummary } from './types.ts'
 import { pluralize } from './utils.ts'
 
 const MAX_FILE_SIZE_BYTES = 900_000
@@ -11,8 +11,9 @@ export async function lintFiles(
   apiKey: string,
   axeLinterUrl: string,
   linterConfig: Record<string, unknown>
-): Promise<number> {
+): Promise<LintSummary> {
   let totalErrors = 0
+  const results: FileResult[] = []
 
   for (const file of files) {
     const fileSize = statSync(file).size
@@ -22,6 +23,12 @@ export async function lintFiles(
       core.warning(
         `Skipping ${file}: file size (${fileSize} bytes) exceeds ${MAX_FILE_SIZE_BYTES} bytes limit`
       )
+      results.push({
+        file,
+        status: 'skipped-oversized',
+        errors: [],
+        sizeBytes: fileSize
+      })
       continue
     }
 
@@ -30,6 +37,7 @@ export async function lintFiles(
     // Skip empty files
     if (!fileContents.trim()) {
       core.debug(`Skipping empty file ${file}`)
+      results.push({ file, status: 'skipped-empty', errors: [] })
       continue
     }
 
@@ -83,7 +91,9 @@ export async function lintFiles(
     const contentType = response.headers.get('content-type')
 
     if (!contentType?.includes('application/json')) {
-      throw new Error('Invalid content type')
+      throw new Error(
+        `Invalid content type: expected application/json but received "${contentType ?? 'none'}" (HTTP ${response.status}) from ${response.url}`
+      )
     }
 
     const result = (await response.json()) as LinterResponse
@@ -94,6 +104,7 @@ export async function lintFiles(
 
     const errors = result.report.errors
     totalErrors += errors.length
+    results.push({ file, status: 'linted', errors })
 
     // Report errors using GitHub annotations
     for (const error of errors) {
@@ -111,5 +122,5 @@ export async function lintFiles(
   }
 
   core.debug(`Found ${totalErrors} error${pluralize(totalErrors)}`)
-  return totalErrors
+  return { results, totalErrors }
 }

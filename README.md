@@ -62,6 +62,18 @@ tags page — for axe-linter-action, its
 [Dependabot](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/keeping-your-actions-up-to-date-with-dependabot)
 keep the pins up to date for you.
 
+## Step summary
+
+Every run writes a [job step summary](https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary)
+to the workflow run page with a detailed accounting of what happened:
+
+- **All findings**, grouped per file — not just the first few. GitHub caps
+  inline annotations at 10 per step, so the summary is the place to see the
+  complete list.
+- **Skipped files** (empty or over the size limit) and why they were skipped.
+- On failure, a clear explanation and the error, so a run that goes wrong is
+  easier to debug.
+
 ## Limitation
 
 There is a limitation on the amount of annotations that can be made per step.
@@ -69,7 +81,9 @@ There is a limitation on the amount of annotations that can be made per step.
 - 10 warning annotations
 - 10 error annotations
 
-If there are more errors, they will not be reported. If you would like to view the errors please view the action logs.
+If there are more errors, they will not appear as inline annotations. All
+findings are still listed in full in the [step summary](#step-summary), and the
+complete details are also available in the action logs.
 
 Additional information can be found in [this GitHub discussion](https://github.com/orgs/community/discussions/26680).
 
