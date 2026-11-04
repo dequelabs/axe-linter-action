@@ -6,9 +6,10 @@ on:
       - reopened
       - edited
       - synchronize
+permissions: {}
 jobs:
   semantic-pr-footer:
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
-      - uses: dequelabs/axe-api-team-public/.github/actions/semantic-pr-footer-v1@main
+      - uses: dequelabs/axe-api-team-public/.github/actions/semantic-pr-footer-v1@5aa852f957ce02ccfc90927effbf3c36e6979bb5 # v2.1.0
