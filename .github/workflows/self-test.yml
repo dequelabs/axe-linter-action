@@ -12,18 +12,57 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: read
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' && github.event_name != 'merge_group' }}
 
 jobs:
+  build:
+    if: ${{ !github.event.pull_request.draft }}
+    name: Build Action
+    permissions:
+      contents: read # Check out the repository
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    outputs:
+      dist-stale: ${{ steps.check-dist.outputs.stale }}
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: '10.32.1'
+      - name: Set Up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build Action
+        run: pnpm build
+      - name: Check Committed dist
+        id: check-dist
+        run: .github/scripts/check-dist.sh
+      - name: Upload Built dist
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
   self-test:
-    if: ${{ !github.event.pull_request.draft && (github.event_name == 'push' || !github.event.pull_request.head.repo.fork) }}
+    needs: build
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork }}
     name: Self-Test
+    permissions:
+      contents: read # Check out the repository
+      pull-requests: read # List the files changed in the pull request
     environment:
       name: general
     runs-on: ubuntu-slim
@@ -31,11 +70,46 @@ jobs:
     steps:
       - name: Check Out Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Remove Committed dist
+        if: ${{ github.event_name == 'pull_request' }}
+        run: rm -rf dist
+      - name: Download Built dist
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
       - name: Run axe Linter
-        uses: ./
         env:
           AXE_LINTER_ONLY: 'fixtures/**'
+        uses: ./ # zizmor: ignore[self-repository]
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           api_key: ${{ secrets.API_KEY }}
           axe_linter_url: ${{ vars.LINTER_URL }}
+
+  dist-comment:
+    needs: build
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && github.event.pull_request.user.login != 'dependabot[bot]' }}
+    name: Report Stale dist
+    permissions:
+      contents: read # Check out the base branch scripts
+      pull-requests: write # Create, update, or delete the stale dist comment
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Check Out Base Branch Scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Update Stale dist Comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DIST_STALE: ${{ needs.build.outputs.dist-stale }}
+        run: .github/scripts/self-test/update-dist-comment.sh
